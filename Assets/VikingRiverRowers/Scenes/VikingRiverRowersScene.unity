@@ -532,9 +532,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 333f1e5ca8e1d401a8d41371899101d0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::VikingRiverRowers.EnvironmentManager
-  segmentCount: 5
-  segmentLength: 15
-  startZOffset: -15
+  segmentCount: 10
+  segmentLength: 20
+  startZOffset: -60
   waterMaterial: {fileID: 0}
   bankMaterial: {fileID: 0}
   trunkMaterial: {fileID: 0}

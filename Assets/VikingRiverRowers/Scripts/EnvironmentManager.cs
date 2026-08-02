@@ -7,9 +7,9 @@ namespace VikingRiverRowers
         public static EnvironmentManager Instance { get; private set; }
 
         [Header("Scrolling Settings")]
-        [SerializeField] private int segmentCount = 5;
-        [SerializeField] private float segmentLength = 15f;
-        [SerializeField] private float startZOffset = -15f; // Where the first segment starts
+        [SerializeField] private int segmentCount = 10;
+        [SerializeField] private float segmentLength = 20f;
+        [SerializeField] private float startZOffset = -60f; // Starts well behind the camera so no trailing edge is visible.
 
         [Header("Materials")]
         [SerializeField] private Material waterMaterial;
@@ -270,8 +270,8 @@ namespace VikingRiverRowers
                 Vector3 pos = segments[i].transform.position;
                 pos.z -= scrollSpeed * Time.deltaTime;
 
-                // Recycle check: if segment went entirely behind camera
-                if (pos.z < startZOffset)
+                // Recycle only after the whole segment has moved behind the covered river strip.
+                if (pos.z < startZOffset - segmentLength)
                 {
                     pos.z += totalLength;
                     // Re-randomize tree and foam positions slightly on recycling to avoid looking repetitive
