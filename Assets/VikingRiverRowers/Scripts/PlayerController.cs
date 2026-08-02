@@ -53,6 +53,7 @@ namespace VikingRiverRowers
 
         // Boost events for animator syncing
         public bool IsBoosting { get; private set; }
+        public float RapidDanger01 => Mathf.Clamp01(Mathf.Abs(currentZ) / Mathf.Abs(minZLimit));
         private float boostVisualTimer;
 
         private void Awake()

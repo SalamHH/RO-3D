@@ -17,6 +17,9 @@ namespace VikingRiverRowers
         [SerializeField] private Text scoreText;
         [SerializeField] private Text levelText;
         [SerializeField] private Text rapidWarningText;
+        [SerializeField] private Text milestoneMessageText;
+        [SerializeField] private GameObject rapidDangerPanel;
+        [SerializeField] private Image rapidDangerFill;
 
         [SerializeField] private Text startHighScoreText;
         [SerializeField] private Text gameOverScoreText;
@@ -24,6 +27,8 @@ namespace VikingRiverRowers
 
         [SerializeField] private Button startButton;
         [SerializeField] private Button restartButton;
+
+        private float milestoneMessageTimer;
 
         private void Awake()
         {
@@ -45,12 +50,14 @@ namespace VikingRiverRowers
         {
             GameManager.OnStateChanged += HandleStateChanged;
             GameManager.OnScoreUpdated += HandleScoreUpdated;
+            GameManager.OnBannerMessage += HandleBannerMessage;
         }
 
         private void OnDisable()
         {
             GameManager.OnStateChanged -= HandleStateChanged;
             GameManager.OnScoreUpdated -= HandleScoreUpdated;
+            GameManager.OnBannerMessage -= HandleBannerMessage;
         }
 
         private void Start()
@@ -129,6 +136,52 @@ namespace VikingRiverRowers
             var warningRect = rapidWarningText.GetComponent<RectTransform>();
             warningRect.sizeDelta = new Vector2(500f, 50f);
             rapidWarningText.gameObject.SetActive(false);
+
+            // Milestone / reward banner
+            GameObject milestoneObj = CreateText("MilestoneMessage", hudPanel.transform, "", defaultFont, 28, new Color(1f, 0.86f, 0.2f, 1f), new Vector2(0f, 38f));
+            milestoneMessageText = milestoneObj.GetComponent<Text>();
+            milestoneMessageText.alignment = TextAnchor.MiddleCenter;
+            var milestoneRect = milestoneMessageText.GetComponent<RectTransform>();
+            milestoneRect.anchorMin = new Vector2(0.5f, 0.5f);
+            milestoneRect.anchorMax = new Vector2(0.5f, 0.5f);
+            milestoneRect.sizeDelta = new Vector2(620f, 58f);
+            milestoneMessageText.gameObject.SetActive(false);
+
+            // Rapid pushback danger gauge
+            rapidDangerPanel = new GameObject("RapidDangerPanel", typeof(Image));
+            rapidDangerPanel.transform.SetParent(hudPanel.transform, false);
+            Image dangerBg = rapidDangerPanel.GetComponent<Image>();
+            dangerBg.color = new Color(0.04f, 0.05f, 0.06f, 0.72f);
+            var dangerRect = rapidDangerPanel.GetComponent<RectTransform>();
+            dangerRect.anchorMin = new Vector2(0.5f, 0f);
+            dangerRect.anchorMax = new Vector2(0.5f, 0f);
+            dangerRect.pivot = new Vector2(0.5f, 0f);
+            dangerRect.sizeDelta = new Vector2(460f, 18f);
+            dangerRect.anchoredPosition = new Vector2(0f, 34f);
+
+            GameObject dangerFillObj = new GameObject("RapidDangerFill", typeof(Image));
+            dangerFillObj.transform.SetParent(rapidDangerPanel.transform, false);
+            rapidDangerFill = dangerFillObj.GetComponent<Image>();
+            rapidDangerFill.color = new Color(1f, 0.18f, 0.08f, 0.92f);
+            rapidDangerFill.type = Image.Type.Filled;
+            rapidDangerFill.fillMethod = Image.FillMethod.Horizontal;
+            rapidDangerFill.fillOrigin = 0;
+            rapidDangerFill.fillAmount = 0f;
+            var dangerFillRect = rapidDangerFill.GetComponent<RectTransform>();
+            dangerFillRect.anchorMin = Vector2.zero;
+            dangerFillRect.anchorMax = Vector2.one;
+            dangerFillRect.offsetMin = new Vector2(2f, 2f);
+            dangerFillRect.offsetMax = new Vector2(-2f, -2f);
+
+            GameObject dangerLabelObj = CreateText("RapidDangerLabel", rapidDangerPanel.transform, "PUSHBACK", defaultFont, 13, Color.white, Vector2.zero);
+            Text dangerLabel = dangerLabelObj.GetComponent<Text>();
+            dangerLabel.alignment = TextAnchor.MiddleCenter;
+            var dangerLabelRect = dangerLabel.GetComponent<RectTransform>();
+            dangerLabelRect.anchorMin = Vector2.zero;
+            dangerLabelRect.anchorMax = Vector2.one;
+            dangerLabelRect.sizeDelta = Vector2.zero;
+            dangerLabelRect.anchoredPosition = Vector2.zero;
+            rapidDangerPanel.SetActive(false);
 
             // 4. Create Game Over Panel
             gameOverPanel = CreatePanel("GameOverPanel", canvas.transform, new Color(0.2f, 0.05f, 0.05f, 0.9f));
@@ -236,7 +289,17 @@ namespace VikingRiverRowers
             string text = $"Distance: {Mathf.FloorToInt(dist)}m";
             if (scoreText != null) scoreText.text = text;
 
-            if (levelText != null) levelText.text = $"Level: {GameManager.Instance.CurrentLevel}";
+            if (levelText != null) levelText.text = $"Level {GameManager.Instance.CurrentLevel}: {GameManager.Instance.CurrentLevelName}";
+        }
+
+        private void HandleBannerMessage(string message)
+        {
+            if (milestoneMessageText == null) return;
+
+            milestoneMessageText.text = message;
+            milestoneMessageText.color = new Color(milestoneMessageText.color.r, milestoneMessageText.color.g, milestoneMessageText.color.b, 1f);
+            milestoneMessageText.gameObject.SetActive(true);
+            milestoneMessageTimer = 2.2f;
         }
 
         private void UpdateUIState(GameState state)
@@ -257,13 +320,18 @@ namespace VikingRiverRowers
             else if (state == GameState.RapidPhase)
             {
                 if (rapidWarningText != null) rapidWarningText.gameObject.SetActive(true);
+                if (rapidDangerPanel != null) rapidDangerPanel.SetActive(true);
             }
             else if (state == GameState.Playing)
             {
-                if (rapidWarningText != null) rapidWarningText.gameObject.SetActive(false);
+                UpdateRapidWarning();
+                if (rapidDangerPanel != null) rapidDangerPanel.SetActive(false);
             }
             else if (state == GameState.GameOver)
             {
+                if (rapidWarningText != null) rapidWarningText.gameObject.SetActive(false);
+                if (rapidDangerPanel != null) rapidDangerPanel.SetActive(false);
+
                 if (GameManager.Instance != null)
                 {
                     float dist = GameManager.Instance.DistanceTraveled;
@@ -275,16 +343,61 @@ namespace VikingRiverRowers
 
         private void Update()
         {
-            // Simple visual pulsing effect for warning banner or text
-            if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.RapidPhase)
+            if (GameManager.Instance == null) return;
+
+            UpdateRapidWarning();
+            UpdateRapidDangerGauge();
+            UpdateMilestoneMessage();
+        }
+
+        private void UpdateRapidWarning()
+        {
+            if (rapidWarningText == null || GameManager.Instance == null) return;
+
+            GameState state = GameManager.Instance.CurrentState;
+            if (state == GameState.RapidPhase)
             {
-                if (rapidWarningText != null)
-                {
-                    float alpha = 0.4f + Mathf.PingPong(Time.time * 3f, 0.6f);
-                    Color col = rapidWarningText.color;
-                    col.a = alpha;
-                    rapidWarningText.color = col;
-                }
+                rapidWarningText.gameObject.SetActive(true);
+                rapidWarningText.text = $"RAPID SURGE! {Mathf.CeilToInt(GameManager.Instance.RapidTimeRemaining)}s";
+                rapidWarningText.color = new Color(1f, 0.12f, 0.08f, 0.45f + Mathf.PingPong(Time.time * 3f, 0.55f));
+            }
+            else if (state == GameState.Playing && GameManager.Instance.IsRapidIncoming)
+            {
+                int countdown = Mathf.CeilToInt(GameManager.Instance.TimeUntilRapid);
+                rapidWarningText.gameObject.SetActive(true);
+                rapidWarningText.text = $"RAPIDS IN {countdown}";
+                rapidWarningText.color = new Color(1f, 0.7f, 0.1f, 0.8f + Mathf.PingPong(Time.time * 4f, 0.2f));
+            }
+            else
+            {
+                rapidWarningText.gameObject.SetActive(false);
+            }
+        }
+
+        private void UpdateRapidDangerGauge()
+        {
+            bool showGauge = GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.RapidPhase;
+            if (rapidDangerPanel != null) rapidDangerPanel.SetActive(showGauge);
+            if (!showGauge || rapidDangerFill == null || PlayerController.Instance == null) return;
+
+            float danger = PlayerController.Instance.RapidDanger01;
+            rapidDangerFill.fillAmount = danger;
+            rapidDangerFill.color = Color.Lerp(new Color(0.1f, 0.75f, 1f, 0.88f), new Color(1f, 0.08f, 0.04f, 0.95f), danger);
+        }
+
+        private void UpdateMilestoneMessage()
+        {
+            if (milestoneMessageText == null || !milestoneMessageText.gameObject.activeSelf) return;
+
+            milestoneMessageTimer -= Time.deltaTime;
+            float alpha = Mathf.Clamp01(milestoneMessageTimer / 0.45f);
+            Color color = milestoneMessageText.color;
+            color.a = alpha;
+            milestoneMessageText.color = color;
+
+            if (milestoneMessageTimer <= 0f)
+            {
+                milestoneMessageText.gameObject.SetActive(false);
             }
         }
     }

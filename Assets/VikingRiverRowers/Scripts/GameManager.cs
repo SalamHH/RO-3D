@@ -28,24 +28,35 @@ namespace VikingRiverRowers
         [Header("Rapid Phase Settings")]
         [SerializeField] private float timeBetweenRapids = 30f; // Time in seconds between rapids
         [SerializeField] private float rapidPhaseDuration = 12f; // How long rapid phase lasts
+        [SerializeField] private float rapidWarningLeadTime = 5f;
+        [SerializeField] private float rapidSurvivalBonus = 100f;
         
         [Header("Scoring")]
         [SerializeField] private float distanceScoreMultiplier = 2f; // Distance units per meter of scroll
+        [SerializeField] private float milestoneInterval = 500f;
 
         // Active properties
         public float CurrentSpeed { get; private set; }
         public float DistanceTraveled { get; private set; }
         public float HighScore { get; private set; }
         public int CurrentLevel { get; private set; } = 1;
+        public float TimeUntilRapid => currentState == GameState.Playing ? Mathf.Max(0f, nextRapidTimer) : 0f;
+        public float RapidTimeRemaining => currentState == GameState.RapidPhase ? Mathf.Max(0f, rapidPhaseTimer) : 0f;
+        public float RapidWarningLeadTime => rapidWarningLeadTime;
+        public bool IsRapidIncoming => currentState == GameState.Playing && nextRapidTimer <= rapidWarningLeadTime;
+        public string CurrentLevelName => GetLevelName(CurrentLevel);
 
         // Timers
         private float nextRapidTimer;
         private float rapidPhaseTimer;
         private float activePlayTime;
+        private float nextMilestone;
+        private int lastAnnouncedLevel = 1;
 
         // Events
         public static event Action<GameState> OnStateChanged;
         public static event Action OnScoreUpdated;
+        public static event Action<string> OnBannerMessage;
 
         private void Awake()
         {
@@ -91,6 +102,7 @@ namespace VikingRiverRowers
                 activePlayTime += Time.deltaTime;
                 float dynamicBaseSpeed = Mathf.Min(baseSpeed + (activePlayTime * speedIncreaseRate), maxBaseSpeed);
                 CurrentLevel = Mathf.FloorToInt(dynamicBaseSpeed / 5f) + 1;
+                CheckLevelProgression();
 
                 if (currentState == GameState.RapidPhase)
                 {
@@ -115,6 +127,7 @@ namespace VikingRiverRowers
 
                 // Increment distance score
                 DistanceTraveled += CurrentSpeed * distanceScoreMultiplier * Time.deltaTime;
+                CheckMilestones();
                 OnScoreUpdated?.Invoke();
             }
             else
@@ -128,6 +141,9 @@ namespace VikingRiverRowers
             DistanceTraveled = 0f;
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
+            nextMilestone = milestoneInterval;
+            CurrentLevel = Mathf.FloorToInt(baseSpeed / 5f) + 1;
+            lastAnnouncedLevel = CurrentLevel;
 
             if (PlayerController.Instance != null)
             {
@@ -135,18 +151,24 @@ namespace VikingRiverRowers
             }
 
             SetState(GameState.Playing);
+            OnBannerMessage?.Invoke("CALM RIVER");
         }
 
         private void TriggerRapidPhase()
         {
             rapidPhaseTimer = rapidPhaseDuration;
             SetState(GameState.RapidPhase);
+            OnBannerMessage?.Invoke("RAPID SURGE!");
         }
 
         private void EndRapidPhase()
         {
             nextRapidTimer = timeBetweenRapids;
+            DistanceTraveled += rapidSurvivalBonus;
+            CheckMilestones();
             SetState(GameState.Playing);
+            OnBannerMessage?.Invoke($"+{Mathf.FloorToInt(rapidSurvivalBonus)}m SURGE SURVIVED");
+            OnScoreUpdated?.Invoke();
         }
 
         public void TriggerGameOver()
@@ -171,6 +193,34 @@ namespace VikingRiverRowers
         {
             currentState = newState;
             OnStateChanged?.Invoke(currentState);
+        }
+
+        private void CheckMilestones()
+        {
+            if (milestoneInterval <= 0f) return;
+
+            while (DistanceTraveled >= nextMilestone)
+            {
+                OnBannerMessage?.Invoke($"{Mathf.FloorToInt(nextMilestone)}m - {CurrentLevelName}");
+                nextMilestone += milestoneInterval;
+            }
+        }
+
+        private void CheckLevelProgression()
+        {
+            if (CurrentLevel <= lastAnnouncedLevel) return;
+
+            lastAnnouncedLevel = CurrentLevel;
+            OnBannerMessage?.Invoke(CurrentLevelName.ToUpperInvariant());
+        }
+
+        private string GetLevelName(int level)
+        {
+            if (level <= 2) return "Calm River";
+            if (level <= 3) return "Rocky Bend";
+            if (level <= 4) return "Whitewater";
+            if (level <= 5) return "Storm Run";
+            return "Legend Run";
         }
     }
 }
