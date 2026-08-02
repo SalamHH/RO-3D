@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.Networking;
+using System.Collections;
 
 namespace VikingRiverRowers
 {
@@ -10,16 +12,22 @@ namespace VikingRiverRowers
         [SerializeField, Range(0f, 1f)] private float masterVolume = 0.85f;
         [SerializeField, Range(0f, 1f)] private float rowingVolume = 0.36f;
         [SerializeField, Range(0f, 1f)] private float rapidVolume = 0.55f;
+        [SerializeField, Range(0f, 1f)] private float rapidChantVolume = 0.82f;
         [SerializeField, Range(0f, 1f)] private float sfxVolume = 0.7f;
 
         [Header("Enabled Sounds")]
         [SerializeField] private bool enableLaneSwitchSound = true;
         [SerializeField] private bool enableRowingSound = false;
         [SerializeField] private bool enableRapidDrums = false;
+        [SerializeField] private bool enableRapidChant = true;
         [SerializeField] private bool enableBoostSound = false;
         [SerializeField] private bool enableRapidHorn = false;
         [SerializeField] private bool enableCrashSound = false;
         [SerializeField] private bool enableStartSound = false;
+
+        [Header("Audio Assets")]
+        [SerializeField] private AudioClip rapidChantClip;
+        [SerializeField] private string rapidChantAssetPath = "Audio/RO chant.wav";
 
         [Header("Rhythm")]
         [SerializeField] private float normalRowInterval = 0.48f;
@@ -34,6 +42,7 @@ namespace VikingRiverRowers
 
         private AudioClip rowClip;
         private AudioClip rapidDrumClip;
+        private bool rapidChantLoadAttempted;
         private AudioClip boostSplashClip;
         private AudioClip laneWhooshClip;
         private AudioClip hornClip;
@@ -120,6 +129,7 @@ namespace VikingRiverRowers
 
             if (newState == GameState.Playing)
             {
+                StopRapidChant();
                 rowTimer = 0.05f;
                 rapidDrumTimer = rapidDrumInterval;
 
@@ -132,6 +142,7 @@ namespace VikingRiverRowers
             {
                 rowTimer = 0f;
                 rapidDrumTimer = 0.12f;
+                PlayRapidChant();
                 if (enableRapidHorn)
                 {
                     PlayOneShot(surgeSource, hornClip, sfxVolume, 1f);
@@ -139,9 +150,118 @@ namespace VikingRiverRowers
             }
             else if (newState == GameState.GameOver)
             {
+                StopRapidChant();
                 if (enableCrashSound)
                 {
                     PlayOneShot(surgeSource, crashClip, sfxVolume, 1f);
+                }
+            }
+            else
+            {
+                StopRapidChant();
+            }
+        }
+
+        private void PlayRapidChant()
+        {
+            if (!enableRapidChant) return;
+
+            surgeSource.loop = true;
+            surgeSource.volume = rapidChantVolume * masterVolume;
+            surgeSource.pitch = 1f;
+
+            if (rapidChantClip != null)
+            {
+                if (surgeSource.clip != rapidChantClip)
+                {
+                    surgeSource.clip = rapidChantClip;
+                }
+
+                if (!surgeSource.isPlaying)
+                {
+                    surgeSource.Play();
+                }
+                return;
+            }
+
+            if (!rapidChantLoadAttempted)
+            {
+                rapidChantLoadAttempted = true;
+                StartCoroutine(LoadRapidChantFromAssets());
+            }
+        }
+
+        private void StopRapidChant()
+        {
+            if (surgeSource == null || !surgeSource.loop) return;
+
+            surgeSource.Stop();
+            surgeSource.clip = null;
+            surgeSource.loop = false;
+        }
+
+        private IEnumerator LoadRapidChantFromAssets()
+        {
+            if (string.IsNullOrWhiteSpace(rapidChantAssetPath)) yield break;
+
+            string audioPath = System.IO.Path.Combine(Application.streamingAssetsPath, rapidChantAssetPath);
+            string audioUri = new System.Uri(audioPath).AbsoluteUri;
+
+            using (UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(audioUri, AudioType.WAV))
+            {
+                yield return request.SendWebRequest();
+
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogWarning($"Could not load rapid rowing chant from {audioUri}: {request.error}");
+                    yield return LoadRapidChantFallback();
+                    yield break;
+                }
+
+                rapidChantClip = DownloadHandlerAudioClip.GetContent(request);
+                if (rapidChantClip == null)
+                {
+                    Debug.LogWarning($"Rapid rowing chant at {audioUri} did not decode into an AudioClip.");
+                    yield return LoadRapidChantFallback();
+                    yield break;
+                }
+
+                rapidChantClip.name = "RO chant";
+                if (currentState == GameState.RapidPhase)
+                {
+                    PlayRapidChant();
+                }
+            }
+        }
+
+        private IEnumerator LoadRapidChantFallback()
+        {
+            const string fallbackPath = "Audio/RO chant.m4a";
+
+            string fallbackAudioPath = System.IO.Path.Combine(Application.dataPath, fallbackPath);
+            string fallbackAudioUri = new System.Uri(fallbackAudioPath).AbsoluteUri;
+
+            using (UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(fallbackAudioUri, AudioType.ACC))
+            {
+                yield return request.SendWebRequest();
+
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    Debug.LogWarning($"Could not load fallback rapid rowing chant from {fallbackAudioUri}: {request.error}");
+                    yield break;
+                }
+
+                rapidChantClip = DownloadHandlerAudioClip.GetContent(request);
+                if (rapidChantClip == null)
+                {
+                    Debug.LogWarning($"Fallback rapid rowing chant at {fallbackAudioUri} did not decode into an AudioClip.");
+                    yield break;
+                }
+
+                rapidChantClip.name = "RO chant";
+                if (currentState == GameState.RapidPhase)
+                {
+                    PlayRapidChant();
                 }
             }
         }
