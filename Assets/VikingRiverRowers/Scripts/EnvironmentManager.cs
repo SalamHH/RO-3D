@@ -1,4 +1,5 @@
 using UnityEngine;
+using Bitgem.VFX.StylisedWater;
 
 namespace VikingRiverRowers
 {
@@ -102,36 +103,10 @@ namespace VikingRiverRowers
             segment.transform.position = new Vector3(0, 0, zPosition);
 
             // 1. Create River Water (Center)
-            GameObject water = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            GameObject water = CreateWaterVolume();
             water.name = "Water";
             water.transform.SetParent(segment.transform);
-            water.transform.localPosition = new Vector3(0f, -0.05f, segmentLength / 2f);
-            water.transform.localScale = new Vector3(10.2f, 0.1f, segmentLength);
-            water.GetComponent<Renderer>().material = waterMaterial;
-            
-            if (water.TryGetComponent<BoxCollider>(out var waterCol))
-            {
-                Destroy(waterCol);
-            }
-
-            // Stylized Foam / Current Wave Strips
-            int foamCount = Random.Range(2, 4);
-            for (int i = 0; i < foamCount; i++)
-            {
-                GameObject foam = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                foam.name = "FoamStrip";
-                foam.transform.SetParent(segment.transform);
-                float fx = Random.Range(-4.5f, 4.5f);
-                float fz = Random.Range(1f, segmentLength - 1f);
-                float fWidth = Random.Range(0.15f, 0.4f);
-                float fLength = Random.Range(2.5f, 6.0f);
-                
-                foam.transform.localPosition = new Vector3(fx, 0.012f, fz);
-                foam.transform.localScale = new Vector3(fWidth, 0.01f, fLength);
-                foam.GetComponent<Renderer>().material = foamMaterial;
-                
-                if (foam.TryGetComponent<BoxCollider>(out var fc)) Destroy(fc);
-            }
+            water.transform.localPosition = new Vector3(-4.5f, 0f, 0.5f);
 
             // 2. Create Left Bank
             GameObject leftBank = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -181,6 +156,27 @@ namespace VikingRiverRowers
             AddScenicRocks(segment.transform, 6f);   // Right Scenic Rocks
 
             return segment;
+        }
+
+        private GameObject CreateWaterVolume()
+        {
+            GameObject water = new GameObject("Water");
+
+            MeshRenderer renderer = water.AddComponent<MeshRenderer>();
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = true;
+            renderer.material = waterMaterial;
+
+            WaterVolumeBox waterVolume = water.AddComponent<WaterVolumeBox>();
+            waterVolume.TileSize = 0.5f;
+            waterVolume.Dimensions = new Vector3(10f, 0.5f, segmentLength);
+            waterVolume.IncludeFaces = WaterVolumeBase.TileFace.NegX | WaterVolumeBase.TileFace.PosX;
+            waterVolume.IncludeFoam = WaterVolumeBase.TileFace.NegX | WaterVolumeBase.TileFace.PosX;
+            waterVolume.ShowDebug = false;
+            waterVolume.RealtimeUpdates = false;
+            waterVolume.Rebuild();
+
+            return water;
         }
 
         private void AddTreesToBank(Transform parent, float bankLocalX)

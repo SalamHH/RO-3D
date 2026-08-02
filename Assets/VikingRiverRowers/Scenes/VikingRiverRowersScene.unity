@@ -535,7 +535,7 @@ MonoBehaviour:
   segmentCount: 10
   segmentLength: 20
   startZOffset: -60
-  waterMaterial: {fileID: 0}
+  waterMaterial: {fileID: 2100000, guid: 16ca5feb16ef2d744852096378401523, type: 2}
   bankMaterial: {fileID: 0}
   trunkMaterial: {fileID: 0}
   foliageMaterial: {fileID: 0}
