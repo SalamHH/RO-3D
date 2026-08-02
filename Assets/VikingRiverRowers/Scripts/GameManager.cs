@@ -58,6 +58,24 @@ namespace VikingRiverRowers
             DontDestroyOnLoad(gameObject);
 
             HighScore = PlayerPrefs.GetFloat("Viking_HighScore", 0f);
+            EnsureAudioManager();
+            EnsureFeedbackManager();
+        }
+
+        private void EnsureAudioManager()
+        {
+            if (FindAnyObjectByType<AudioManager>() != null) return;
+
+            GameObject audioObj = new GameObject("AudioManager");
+            audioObj.AddComponent<AudioManager>();
+        }
+
+        private void EnsureFeedbackManager()
+        {
+            if (FindAnyObjectByType<FeedbackManager>() != null) return;
+
+            GameObject feedbackObj = new GameObject("FeedbackManager");
+            feedbackObj.AddComponent<FeedbackManager>();
         }
 
         private void Start()
@@ -110,6 +128,12 @@ namespace VikingRiverRowers
             DistanceTraveled = 0f;
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
+
+            if (PlayerController.Instance != null)
+            {
+                PlayerController.Instance.ResetToMiddleLane();
+            }
+
             SetState(GameState.Playing);
         }
 
@@ -127,6 +151,8 @@ namespace VikingRiverRowers
 
         public void TriggerGameOver()
         {
+            if (currentState == GameState.GameOver) return;
+
             if (DistanceTraveled > HighScore)
             {
                 HighScore = DistanceTraveled;

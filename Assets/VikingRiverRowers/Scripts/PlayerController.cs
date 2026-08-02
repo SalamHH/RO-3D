@@ -1,11 +1,15 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using System;
 
 namespace VikingRiverRowers
 {
     public class PlayerController : MonoBehaviour
     {
         public static PlayerController Instance { get; private set; }
+
+        public static event Action OnBoosted;
+        public static event Action OnLaneChanged;
 
         [Header("Lane Settings")]
         [SerializeField] private float[] lanePositions = { -3f, 0f, 3f };
@@ -18,6 +22,11 @@ namespace VikingRiverRowers
         [SerializeField] private float bobFrequency = 2.5f;
         [SerializeField] private float rollAmplitude = 3f;
         [SerializeField] private float rollFrequency = 1.5f;
+
+        [Header("Game Feel")]
+        [SerializeField] private float laneKickAngle = 12f;
+        [SerializeField] private float boostPitchKickAngle = 8f;
+        [SerializeField] private float feedbackReturnSpeed = 12f;
 
         [Header("Rapid Phase Pushback")]
         [SerializeField] private float pushbackSpeed = 1.6f; // Speed of drift backward
@@ -35,6 +44,8 @@ namespace VikingRiverRowers
         private float visualYOffset = 0f;
         private float laneSwitchVelocity; // Speed tracking for SmoothDamp
         private float currentTilt = 0f;   // Smoothly lerped roll tilt
+        private float laneKick;
+        private float boostPitchKick;
 
         // Swipe processing variables
         private Vector2 touchStartPos;
@@ -56,8 +67,7 @@ namespace VikingRiverRowers
 
         private void Start()
         {
-            targetX = lanePositions[currentLane];
-            transform.position = new Vector3(targetX, 0f, 0f);
+            ResetToMiddleLane();
         }
 
         private void Update()
@@ -121,10 +131,12 @@ namespace VikingRiverRowers
 
             // Interpolate the tilt to be smooth and satisfying
             currentTilt = Mathf.Lerp(currentTilt, targetTilt, 10f * Time.deltaTime);
+            laneKick = Mathf.MoveTowards(laneKick, 0f, feedbackReturnSpeed * Time.deltaTime);
+            boostPitchKick = Mathf.MoveTowards(boostPitchKick, 0f, feedbackReturnSpeed * Time.deltaTime);
 
             // Combine lean with idle roll
-            float finalRoll = currentTilt + Mathf.Sin(Time.time * rollFrequency) * rollAmplitude;
-            float finalPitch = Mathf.Cos(Time.time * bobFrequency) * (rollAmplitude * 0.5f);
+            float finalRoll = currentTilt + laneKick + Mathf.Sin(Time.time * rollFrequency) * rollAmplitude;
+            float finalPitch = boostPitchKick + Mathf.Cos(Time.time * bobFrequency) * (rollAmplitude * 0.5f);
 
             transform.rotation = Quaternion.Euler(finalPitch, 0f, finalRoll);
 
@@ -227,7 +239,14 @@ namespace VikingRiverRowers
 
         private void SwitchLane(int dir)
         {
+            int previousLane = currentLane;
             currentLane = Mathf.Clamp(currentLane + dir, 0, lanePositions.Length - 1);
+
+            if (currentLane != previousLane)
+            {
+                laneKick = -dir * laneKickAngle;
+                OnLaneChanged?.Invoke();
+            }
         }
 
         public void BoostForward()
@@ -241,6 +260,25 @@ namespace VikingRiverRowers
             // Visual feedback indicator
             IsBoosting = true;
             boostVisualTimer = 0.25f;
+            boostPitchKick = -boostPitchKickAngle;
+            OnBoosted?.Invoke();
+        }
+
+        public void ResetToMiddleLane()
+        {
+            currentLane = 1;
+            targetX = lanePositions[currentLane];
+            currentZ = 0f;
+            visualYOffset = 0f;
+            laneSwitchVelocity = 0f;
+            currentTilt = 0f;
+            laneKick = 0f;
+            boostPitchKick = 0f;
+            IsBoosting = false;
+            boostVisualTimer = 0f;
+
+            transform.position = new Vector3(targetX, 0f, 0f);
+            transform.rotation = Quaternion.identity;
         }
 
         private void ApplyBobbing(float speedMultiplier)
