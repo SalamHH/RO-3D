@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3090c39d1190a5d4bae3ba535676bda2
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 297952
+  packageName: Viking ship and gear with LODs and collision
+  packageVersion: 1.0
+  assetPath: Assets/IronBlade Assets/Materials/VikingShip/Materials/ShipHullMat.mat
+  uploadId: 697194

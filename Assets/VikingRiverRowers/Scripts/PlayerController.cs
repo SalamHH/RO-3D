@@ -18,6 +18,7 @@ namespace VikingRiverRowers
         [SerializeField] private float tiltAngle = 18f; // Leaning tilt when switching lanes
 
         [Header("Bobbing (Water Animation)")]
+        [SerializeField] private float floatHeight = 0.2f;
         [SerializeField] private float bobAmplitude = 0.15f;
         [SerializeField] private float bobFrequency = 2.5f;
         [SerializeField] private float rollAmplitude = 3f;
@@ -64,6 +65,7 @@ namespace VikingRiverRowers
                 return;
             }
             Instance = this;
+            DisableVisualColliders();
         }
 
         private void Start()
@@ -79,12 +81,13 @@ namespace VikingRiverRowers
             if (state == GameState.GameOver || state == GameState.Menu)
             {
                 // Reset positions in Menu/GameOver
+                ApplyBobbing(0.5f); // Gentle bobbing in menu
                 currentZ = Mathf.MoveTowards(currentZ, 0f, zRecoverySpeed * Time.deltaTime);
                 Vector3 menuPos = transform.position;
+                menuPos.y = visualYOffset;
                 menuPos.z = currentZ;
                 menuPos.x = Mathf.SmoothDamp(menuPos.x, lanePositions[1], ref laneSwitchVelocity, laneSwitchSmoothTime);
                 transform.position = menuPos;
-                ApplyBobbing(0.5f); // Gentle bobbing in menu
                 return;
             }
 
@@ -278,13 +281,23 @@ namespace VikingRiverRowers
             IsBoosting = false;
             boostVisualTimer = 0f;
 
-            transform.position = new Vector3(targetX, 0f, 0f);
+            transform.position = new Vector3(targetX, floatHeight, 0f);
             transform.rotation = Quaternion.identity;
         }
 
         private void ApplyBobbing(float speedMultiplier)
         {
-            visualYOffset = Mathf.Sin(Time.time * bobFrequency * speedMultiplier) * bobAmplitude;
+            visualYOffset = floatHeight + Mathf.Sin(Time.time * bobFrequency * speedMultiplier) * bobAmplitude;
+        }
+
+        private void DisableVisualColliders()
+        {
+            foreach (Collider childCollider in GetComponentsInChildren<Collider>(true))
+            {
+                if (childCollider.transform == transform) continue;
+
+                childCollider.enabled = false;
+            }
         }
 
         private void OnTriggerEnter(Collider other)

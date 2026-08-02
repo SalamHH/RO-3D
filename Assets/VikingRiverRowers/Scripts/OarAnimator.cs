@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace VikingRiverRowers
 {
@@ -14,9 +15,18 @@ namespace VikingRiverRowers
         [SerializeField] private float boostRowMultiplier = 3.5f;   // Sudden rowing burst when boosting
         
         [Header("Rowing Angles")]
-        [SerializeField] private float swingAngle = 18f;  // Yaw rotation forward/back (swinging)
-        [SerializeField] private float dipAngle = 12f;    // Pitch rotation up/down (dipping in/out water)
-        [SerializeField] private float dipOffset = -5f;   // Base tilt downwards into water
+        [SerializeField] private float swingAngle = 14f;  // Yaw rotation forward/back (swinging)
+        [SerializeField] private float dipAngle = 13f;    // Vertical blade travel into and out of the water
+        [SerializeField] private float dipOffset = 7f;    // Positive angle lowers both outer blades toward the water
+
+        [Header("Procedural Fallback Oars")]
+        [SerializeField] private bool useProceduralOars = true;
+        [SerializeField] private int fallbackOarPairs = 5;
+        [SerializeField] private float fallbackOarSideOffset = 0.28f;
+        [SerializeField] private float fallbackOarStartZ = -1.05f;
+        [SerializeField] private float fallbackOarSpacing = 0.46f;
+        [SerializeField] private float fallbackOarHeight = -0.04f;
+        [SerializeField] private float fallbackOarLength = 0.72f;
 
         // Store original local rotations
         private Quaternion[] leftOarStartRotations;
@@ -26,8 +36,12 @@ namespace VikingRiverRowers
 
         private void Start()
         {
-            // Auto-detect oars if they are not manually assigned in inspector
-            if (leftOars == null || leftOars.Length == 0 || rightOars == null || rightOars.Length == 0)
+            if (useProceduralOars)
+            {
+                HideImportedStaticOars();
+                CreateFallbackOars();
+            }
+            else if (leftOars == null || leftOars.Length == 0 || rightOars == null || rightOars.Length == 0)
             {
                 AutoDetectOars();
             }
@@ -48,23 +62,28 @@ namespace VikingRiverRowers
 
         private void AutoDetectOars()
         {
-            // Gather all children and check for names containing "Oar" and "L" / "R"
+            // Gather active child transforms and check for oar/paddle names.
             var children = GetComponentsInChildren<Transform>();
-            var leftList = new System.Collections.Generic.List<Transform>();
-            var rightList = new System.Collections.Generic.List<Transform>();
+            var leftList = new List<Transform>();
+            var rightList = new List<Transform>();
 
             foreach (var child in children)
             {
                 if (child == transform) continue;
 
                 string nameUpper = child.name.ToUpper();
-                if (nameUpper.Contains("OAR"))
+                bool isOar = nameUpper.Contains("OAR");
+                bool isPaddle = nameUpper.Contains("PADDLE");
+                bool isBroadGroup = nameUpper == "PADDLES" || nameUpper == "OARS";
+
+                if ((isOar || isPaddle) && !isBroadGroup)
                 {
-                    if (nameUpper.Contains("_L") || nameUpper.Contains("LEFT") || child.localPosition.x < 0f)
+                    float side = transform.InverseTransformPoint(child.position).x;
+                    if (nameUpper.Contains("_L") || nameUpper.Contains("LEFT") || side < -0.01f)
                     {
                         leftList.Add(child);
                     }
-                    else if (nameUpper.Contains("_R") || nameUpper.Contains("RIGHT") || child.localPosition.x > 0f)
+                    else if (nameUpper.Contains("_R") || nameUpper.Contains("RIGHT") || side > 0.01f)
                     {
                         rightList.Add(child);
                     }
@@ -73,6 +92,93 @@ namespace VikingRiverRowers
 
             leftOars = leftList.ToArray();
             rightOars = rightList.ToArray();
+        }
+
+        private void HideImportedStaticOars()
+        {
+            foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
+            {
+                if (IsProceduralOar(renderer.transform)) continue;
+
+                string nameUpper = renderer.transform.name.ToUpperInvariant();
+                string parentNameUpper = renderer.transform.parent != null ? renderer.transform.parent.name.ToUpperInvariant() : string.Empty;
+                if (nameUpper.Contains("OAR") || nameUpper.Contains("PADDLE") || parentNameUpper.Contains("OAR") || parentNameUpper.Contains("PADDLE"))
+                {
+                    renderer.enabled = false;
+                }
+            }
+        }
+
+        private bool IsProceduralOar(Transform target)
+        {
+            Transform fallbackRig = transform.Find("AnimatedFallbackOars");
+            return fallbackRig != null && target.IsChildOf(fallbackRig);
+        }
+
+        private void CreateFallbackOars()
+        {
+            Transform existingRig = transform.Find("AnimatedFallbackOars");
+            if (existingRig != null)
+            {
+                Destroy(existingRig.gameObject);
+            }
+
+            GameObject rig = new GameObject("AnimatedFallbackOars");
+            rig.transform.SetParent(transform, false);
+
+            Material woodMaterial = CreateMaterial(new Color(0.42f, 0.24f, 0.12f));
+            Material bladeMaterial = CreateMaterial(new Color(0.88f, 0.88f, 0.78f));
+
+            var leftList = new List<Transform>();
+            var rightList = new List<Transform>();
+            float firstZ = fallbackOarStartZ + ((fallbackOarPairs - 1) * fallbackOarSpacing * 0.5f);
+
+            for (int i = 0; i < fallbackOarPairs; i++)
+            {
+                float z = firstZ - (i * fallbackOarSpacing);
+                leftList.Add(CreateFallbackOar(rig.transform, "FallbackOar_L_" + i, -fallbackOarSideOffset, z, -1f, woodMaterial, bladeMaterial));
+                rightList.Add(CreateFallbackOar(rig.transform, "FallbackOar_R_" + i, fallbackOarSideOffset, z, 1f, woodMaterial, bladeMaterial));
+            }
+
+            leftOars = leftList.ToArray();
+            rightOars = rightList.ToArray();
+        }
+
+        private Transform CreateFallbackOar(Transform parent, string name, float x, float z, float side, Material woodMaterial, Material bladeMaterial)
+        {
+            GameObject oar = new GameObject(name);
+            oar.transform.SetParent(parent, false);
+            oar.transform.localPosition = new Vector3(x, fallbackOarHeight, z);
+            oar.transform.localRotation = Quaternion.identity;
+
+            GameObject shaft = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+            shaft.name = "Shaft";
+            shaft.transform.SetParent(oar.transform, false);
+            shaft.transform.localPosition = new Vector3(side * (fallbackOarLength * 0.42f), 0f, 0f);
+            shaft.transform.localRotation = Quaternion.Euler(0f, 0f, 90f);
+            shaft.transform.localScale = new Vector3(0.018f, fallbackOarLength * 0.5f, 0.018f);
+            shaft.GetComponent<Renderer>().material = woodMaterial;
+            Destroy(shaft.GetComponent<Collider>());
+
+            GameObject blade = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            blade.name = "Blade";
+            blade.transform.SetParent(oar.transform, false);
+            blade.transform.localPosition = new Vector3(side * fallbackOarLength, 0f, 0f);
+            blade.transform.localScale = new Vector3(0.16f, 0.032f, 0.085f);
+            blade.GetComponent<Renderer>().material = bladeMaterial;
+            Destroy(blade.GetComponent<Collider>());
+
+            return oar.transform;
+        }
+
+        private Material CreateMaterial(Color color)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Simple Lit");
+            if (shader == null) shader = Shader.Find("Standard");
+
+            Material material = new Material(shader);
+            material.color = color;
+            return material;
         }
 
         private void Update()
@@ -105,11 +211,10 @@ namespace VikingRiverRowers
             {
                 if (leftOars[i] == null) continue;
 
-                // For Left oars, a positive Y swing rotates backward, negative rotates forward
-                // Pitch (X) dips down on positive swing, lifts up on negative
-                float rotX = dipVal * dipAngle + dipOffset;
+                float dip = dipVal * dipAngle + dipOffset;
+                float rotX = 0f;
                 float rotY = swingVal * swingAngle; 
-                float rotZ = -swingVal * (swingAngle * 0.3f); // Slight roll matching the swing
+                float rotZ = dip;
 
                 leftOars[i].localRotation = leftOarStartRotations[i] * Quaternion.Euler(rotX, rotY, rotZ);
             }
@@ -119,10 +224,10 @@ namespace VikingRiverRowers
             {
                 if (rightOars[i] == null) continue;
 
-                // Mirrored angles for the right side
-                float rotX = dipVal * dipAngle + dipOffset;
+                float dip = dipVal * dipAngle + dipOffset;
+                float rotX = 0f;
                 float rotY = -swingVal * swingAngle; 
-                float rotZ = -swingVal * (swingAngle * 0.3f); 
+                float rotZ = -dip;
 
                 rightOars[i].localRotation = rightOarStartRotations[i] * Quaternion.Euler(rotX, rotY, rotZ);
             }

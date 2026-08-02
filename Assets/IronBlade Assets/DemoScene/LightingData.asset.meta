@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 533e2ba188c514e4fae08733aa99f239
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 112000000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 297952
+  packageName: Viking ship and gear with LODs and collision
+  packageVersion: 1.0
+  assetPath: Assets/IronBlade Assets/DemoScene/LightingData.asset
+  uploadId: 697194

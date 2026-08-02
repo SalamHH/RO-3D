@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 3f69df3440e8ec94f85b91392dff5317
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 297952
+  packageName: Viking ship and gear with LODs and collision
+  packageVersion: 1.0
+  assetPath: Assets/IronBlade Assets/Materials/Shield/Materials/ShieldWood.mat
+  uploadId: 697194

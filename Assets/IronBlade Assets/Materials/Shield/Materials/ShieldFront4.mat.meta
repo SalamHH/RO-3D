@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7122ce3b89751544886ef50c34b9fc28
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 297952
+  packageName: Viking ship and gear with LODs and collision
+  packageVersion: 1.0
+  assetPath: Assets/IronBlade Assets/Materials/Shield/Materials/ShieldFront4.mat
+  uploadId: 697194

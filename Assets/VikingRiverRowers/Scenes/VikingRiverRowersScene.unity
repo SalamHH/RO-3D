@@ -539,6 +539,7 @@ MonoBehaviour:
   bankMaterial: {fileID: 0}
   trunkMaterial: {fileID: 0}
   foliageMaterial: {fileID: 0}
+  foamMaterial: {fileID: 0}
 --- !u!4 &1722951525
 Transform:
   m_ObjectHideFlags: 0

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ef7466b931e2cda45b310d4353c51caf
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 297952
+  packageName: Viking ship and gear with LODs and collision
+  packageVersion: 1.0
+  assetPath: Assets/IronBlade Assets/Prefabs/Sword.prefab
+  uploadId: 697194

@@ -283,7 +283,7 @@ namespace VikingRiverRowers
             // Find all PineTree and ScenicRock children and shuffle their Z positions slightly
             foreach (Transform child in segment)
             {
-                if (child.name == "PineTree" || child.name == "ScenicRock" || child.name == "FoamStrip")
+                if (child.name == "PineTree" || child.name == "ScenicRock")
                 {
                     Vector3 localPos = child.localPosition;
                     localPos.z = Random.Range(1f, segmentLength - 1f);
