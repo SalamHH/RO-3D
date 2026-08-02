@@ -184,7 +184,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.00052244274
+      value: 0.005594182
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalPosition.y
@@ -192,11 +192,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -0.00033829524
+      value: 0.0027946234
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.83939123
+      value: 0.70581305
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalRotation.x
@@ -204,7 +204,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalRotation.y
-      value: -0.5435278
+      value: -0.7083982
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalRotation.z
@@ -216,7 +216,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: -65.848
+      value: -90.209
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
@@ -535,9 +535,11 @@ MonoBehaviour:
   rapidDangerPanel: {fileID: 0}
   rapidDangerFill: {fileID: 0}
   startHighScoreText: {fileID: 0}
+  menuStatusText: {fileID: 0}
   gameOverScoreText: {fileID: 0}
   gameOverHighScoreText: {fileID: 0}
   startButton: {fileID: 0}
+  swipeModeButton: {fileID: 0}
   restartButton: {fileID: 0}
 --- !u!4 &1581903889
 Transform:

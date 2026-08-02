@@ -22,10 +22,12 @@ namespace VikingRiverRowers
         [SerializeField] private Image rapidDangerFill;
 
         [SerializeField] private Text startHighScoreText;
+        [SerializeField] private Text menuStatusText;
         [SerializeField] private Text gameOverScoreText;
         [SerializeField] private Text gameOverHighScoreText;
 
         [SerializeField] private Button startButton;
+        [SerializeField] private Button swipeModeButton;
         [SerializeField] private Button restartButton;
 
         private float milestoneMessageTimer;
@@ -72,6 +74,10 @@ namespace VikingRiverRowers
             canvas = canvasObj.GetComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             canvasObj.transform.SetParent(transform);
+            CanvasScaler canvasScaler = canvasObj.GetComponent<CanvasScaler>();
+            canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            canvasScaler.referenceResolution = new Vector2(1920f, 1080f);
+            canvasScaler.matchWidthOrHeight = 0.5f;
 
             // Add EventSystem if missing
             if (UnityEngine.Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
@@ -84,27 +90,41 @@ namespace VikingRiverRowers
             if (defaultFont == null) defaultFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
             // 2. Create Start Panel
-            startPanel = CreatePanel("StartPanel", canvas.transform, new Color(0.1f, 0.1f, 0.15f, 0.85f));
-            
-            // Title
-            GameObject titleObj = CreateText("Title", startPanel.transform, "VIKING RIVER ROWERS", defaultFont, 50, Color.yellow, new Vector2(0f, 150f));
-            titleObj.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            startPanel = CreatePanel("StartPanel", canvas.transform, new Color(0.06f, 0.045f, 0.035f, 0.92f));
 
-            // Instructions
-            GameObject instructObj = CreateText("Instructions", startPanel.transform, "Steer Left/Right: A / D  or  Left / Right Arrow\nRow Boost (Rapids): S / Space\n\nMobile: Swipe Left / Right to steer, Swipe Down / Tap to boost!", defaultFont, 18, Color.white, new Vector2(0f, 20f));
-            instructObj.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
-            var instructRect = instructObj.GetComponent<RectTransform>();
-            instructRect.sizeDelta = new Vector2(600f, 150f);
+            GameObject menuFrame = CreateMenuFrame(startPanel.transform);
+
+            GameObject crestObj = CreateText("MenuCrest", menuFrame.transform, "IRON OARS", defaultFont, 28, new Color(0.78f, 0.68f, 0.45f, 1f), new Vector2(0f, 330f));
+            crestObj.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+
+            GameObject titleObj = CreateText("Title", menuFrame.transform, "VIKING\nRIVER ROWERS", defaultFont, 62, new Color(1f, 0.78f, 0.22f, 1f), new Vector2(0f, 220f));
+            Text titleText = titleObj.GetComponent<Text>();
+            titleText.alignment = TextAnchor.MiddleCenter;
+            titleText.fontStyle = FontStyle.Bold;
+            RectTransform titleRect = titleObj.GetComponent<RectTransform>();
+            titleRect.sizeDelta = new Vector2(760f, 160f);
+
+            CreateDivider("TopDivider", menuFrame.transform, new Vector2(0f, 125f));
+            CreateDivider("BottomDivider", menuFrame.transform, new Vector2(0f, -242f));
 
             // Start High Score
-            GameObject startHSObj = CreateText("HighScore", startPanel.transform, "High Score: 0m", defaultFont, 24, Color.cyan, new Vector2(0f, -80f));
+            GameObject startHSObj = CreateText("HighScore", menuFrame.transform, "High Score: 0m", defaultFont, 25, new Color(0.78f, 0.92f, 1f, 1f), new Vector2(0f, 75f));
             startHighScoreText = startHSObj.GetComponent<Text>();
             startHighScoreText.alignment = TextAnchor.MiddleCenter;
 
-            // Start Button
-            GameObject startBtnObj = CreateButton("StartButton", startPanel.transform, "PADDLE START", defaultFont, new Vector2(0f, -160f));
+            GameObject startBtnObj = CreateVikingButton("StartButton", menuFrame.transform, "NORMAL VOYAGE", defaultFont, new Vector2(0f, -35f), true);
             startButton = startBtnObj.GetComponent<Button>();
             startButton.onClick.AddListener(() => GameManager.Instance.StartGame());
+
+            GameObject swipeBtnObj = CreateVikingButton("SwipeModeButton", menuFrame.transform, "SWIPE MODE", defaultFont, new Vector2(0f, -145f), false);
+            swipeModeButton = swipeBtnObj.GetComponent<Button>();
+            swipeModeButton.onClick.AddListener(ShowSwipeModeComingSoon);
+
+            GameObject statusObj = CreateText("MenuStatus", menuFrame.transform, "", defaultFont, 22, new Color(0.9f, 0.74f, 0.45f, 1f), new Vector2(0f, -285f));
+            menuStatusText = statusObj.GetComponent<Text>();
+            menuStatusText.alignment = TextAnchor.MiddleCenter;
+            RectTransform statusRect = statusObj.GetComponent<RectTransform>();
+            statusRect.sizeDelta = new Vector2(650f, 54f);
 
             // 3. Create HUD Panel
             hudPanel = CreatePanel("HUDPanel", canvas.transform, Color.clear);
@@ -184,24 +204,39 @@ namespace VikingRiverRowers
             rapidDangerPanel.SetActive(false);
 
             // 4. Create Game Over Panel
-            gameOverPanel = CreatePanel("GameOverPanel", canvas.transform, new Color(0.2f, 0.05f, 0.05f, 0.9f));
-            
-            // GO Title
-            GameObject goTitleObj = CreateText("GOTitle", gameOverPanel.transform, "SHIPWRECKED!", defaultFont, 48, Color.red, new Vector2(0f, 120f));
-            goTitleObj.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+            gameOverPanel = CreatePanel("GameOverPanel", canvas.transform, new Color(0.08f, 0.025f, 0.018f, 0.92f));
+
+            GameObject gameOverFrame = CreateMenuFrame(gameOverPanel.transform);
+
+            GameObject defeatObj = CreateText("DefeatCrest", gameOverFrame.transform, "THE RIVER CLAIMED YOU", defaultFont, 24, new Color(0.78f, 0.68f, 0.45f, 1f), new Vector2(0f, 280f));
+            defeatObj.GetComponent<Text>().alignment = TextAnchor.MiddleCenter;
+
+            GameObject goTitleObj = CreateText("GOTitle", gameOverFrame.transform, "SHIPWRECKED!", defaultFont, 58, new Color(1f, 0.28f, 0.12f, 1f), new Vector2(0f, 178f));
+            Text goTitle = goTitleObj.GetComponent<Text>();
+            goTitle.alignment = TextAnchor.MiddleCenter;
+            goTitle.fontStyle = FontStyle.Bold;
+            RectTransform goTitleRect = goTitleObj.GetComponent<RectTransform>();
+            goTitleRect.sizeDelta = new Vector2(720f, 92f);
+
+            CreateDivider("GameOverTopDivider", gameOverFrame.transform, new Vector2(0f, 105f));
+            CreateDivider("GameOverBottomDivider", gameOverFrame.transform, new Vector2(0f, -150f));
 
             // GO Score
-            GameObject goScoreObj = CreateText("GOScore", gameOverPanel.transform, "Distance: 0m", defaultFont, 24, Color.white, new Vector2(0f, 30f));
+            GameObject goScoreObj = CreateText("GOScore", gameOverFrame.transform, "Distance: 0m", defaultFont, 28, Color.white, new Vector2(0f, 45f));
             gameOverScoreText = goScoreObj.GetComponent<Text>();
             gameOverScoreText.alignment = TextAnchor.MiddleCenter;
+            RectTransform goScoreRect = goScoreObj.GetComponent<RectTransform>();
+            goScoreRect.sizeDelta = new Vector2(650f, 60f);
 
             // GO High Score
-            GameObject goHSObj = CreateText("GOHighScore", gameOverPanel.transform, "Best: 0m", defaultFont, 22, Color.yellow, new Vector2(0f, -20f));
+            GameObject goHSObj = CreateText("GOHighScore", gameOverFrame.transform, "Best: 0m", defaultFont, 24, new Color(1f, 0.78f, 0.22f, 1f), new Vector2(0f, -18f));
             gameOverHighScoreText = goHSObj.GetComponent<Text>();
             gameOverHighScoreText.alignment = TextAnchor.MiddleCenter;
+            RectTransform goHSRect = goHSObj.GetComponent<RectTransform>();
+            goHSRect.sizeDelta = new Vector2(650f, 56f);
 
             // Restart Button
-            GameObject restartBtnObj = CreateButton("RestartButton", gameOverPanel.transform, "ROW AGAIN", defaultFont, new Vector2(0f, -120f));
+            GameObject restartBtnObj = CreateVikingButton("RestartButton", gameOverFrame.transform, "ROW AGAIN", defaultFont, new Vector2(0f, -250f), true);
             restartButton = restartBtnObj.GetComponent<Button>();
             restartButton.onClick.AddListener(() => {
                 if (ObstacleSpawner.Instance != null) ObstacleSpawner.Instance.ResetSpawner();
@@ -245,6 +280,66 @@ namespace VikingRiverRowers
             return textObj;
         }
 
+        private GameObject CreateMenuFrame(Transform parent)
+        {
+            GameObject frame = new GameObject("MenuFrame", typeof(Image));
+            frame.transform.SetParent(parent, false);
+
+            Image frameImage = frame.GetComponent<Image>();
+            frameImage.color = new Color(0.17f, 0.095f, 0.045f, 0.92f);
+
+            RectTransform rect = frame.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(820f, 820f);
+            rect.anchoredPosition = Vector2.zero;
+
+            GameObject inner = new GameObject("IronInnerFrame", typeof(Image));
+            inner.transform.SetParent(frame.transform, false);
+            Image innerImage = inner.GetComponent<Image>();
+            innerImage.color = new Color(0.04f, 0.048f, 0.052f, 0.34f);
+            RectTransform innerRect = inner.GetComponent<RectTransform>();
+            innerRect.anchorMin = Vector2.zero;
+            innerRect.anchorMax = Vector2.one;
+            innerRect.offsetMin = new Vector2(22f, 22f);
+            innerRect.offsetMax = new Vector2(-22f, -22f);
+
+            CreateCornerPlate("TopLeftPlate", frame.transform, new Vector2(0f, 1f), new Vector2(1f, -1f));
+            CreateCornerPlate("TopRightPlate", frame.transform, new Vector2(1f, 1f), new Vector2(-1f, -1f));
+            CreateCornerPlate("BottomLeftPlate", frame.transform, new Vector2(0f, 0f), new Vector2(1f, 1f));
+            CreateCornerPlate("BottomRightPlate", frame.transform, new Vector2(1f, 0f), new Vector2(-1f, 1f));
+
+            return frame;
+        }
+
+        private void CreateCornerPlate(string name, Transform parent, Vector2 anchor, Vector2 offsetDirection)
+        {
+            GameObject plate = new GameObject(name, typeof(Image));
+            plate.transform.SetParent(parent, false);
+            plate.GetComponent<Image>().color = new Color(0.56f, 0.52f, 0.43f, 0.95f);
+
+            RectTransform rect = plate.GetComponent<RectTransform>();
+            rect.anchorMin = anchor;
+            rect.anchorMax = anchor;
+            rect.pivot = anchor;
+            rect.sizeDelta = new Vector2(82f, 82f);
+            rect.anchoredPosition = new Vector2(14f * offsetDirection.x, 14f * offsetDirection.y);
+        }
+
+        private GameObject CreateDivider(string name, Transform parent, Vector2 pos)
+        {
+            GameObject divider = new GameObject(name, typeof(Image));
+            divider.transform.SetParent(parent, false);
+            divider.GetComponent<Image>().color = new Color(0.62f, 0.45f, 0.22f, 0.9f);
+
+            RectTransform rect = divider.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(560f, 8f);
+            rect.anchoredPosition = pos;
+
+            return divider;
+        }
+
         private GameObject CreateButton(string name, Transform parent, string labelStr, Font font, Vector2 pos)
         {
             GameObject buttonObj = new GameObject(name, typeof(Image), typeof(Button));
@@ -274,6 +369,75 @@ namespace VikingRiverRowers
             btn.colors = cb;
 
             return buttonObj;
+        }
+
+        private GameObject CreateVikingButton(string name, Transform parent, string labelStr, Font font, Vector2 pos, bool primary)
+        {
+            GameObject buttonObj = new GameObject(name, typeof(Image), typeof(Button));
+            buttonObj.transform.SetParent(parent, false);
+
+            Image img = buttonObj.GetComponent<Image>();
+            img.color = primary ? new Color(0.52f, 0.18f, 0.08f, 1f) : new Color(0.18f, 0.2f, 0.22f, 1f);
+
+            RectTransform rect = buttonObj.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(520f, 78f);
+            rect.anchoredPosition = pos;
+
+            GameObject ironTop = new GameObject("IronTopEdge", typeof(Image));
+            ironTop.transform.SetParent(buttonObj.transform, false);
+            ironTop.GetComponent<Image>().color = new Color(0.72f, 0.66f, 0.5f, 0.92f);
+            RectTransform topRect = ironTop.GetComponent<RectTransform>();
+            topRect.anchorMin = new Vector2(0f, 1f);
+            topRect.anchorMax = new Vector2(1f, 1f);
+            topRect.pivot = new Vector2(0.5f, 1f);
+            topRect.sizeDelta = new Vector2(0f, 8f);
+            topRect.anchoredPosition = Vector2.zero;
+
+            GameObject ironBottom = new GameObject("IronBottomEdge", typeof(Image));
+            ironBottom.transform.SetParent(buttonObj.transform, false);
+            ironBottom.GetComponent<Image>().color = new Color(0.09f, 0.075f, 0.06f, 0.85f);
+            RectTransform bottomRect = ironBottom.GetComponent<RectTransform>();
+            bottomRect.anchorMin = Vector2.zero;
+            bottomRect.anchorMax = new Vector2(1f, 0f);
+            bottomRect.pivot = new Vector2(0.5f, 0f);
+            bottomRect.sizeDelta = new Vector2(0f, 8f);
+            bottomRect.anchoredPosition = Vector2.zero;
+
+            CreateButtonStud("LeftStud", buttonObj.transform, new Vector2(42f, 0f));
+            CreateButtonStud("RightStud", buttonObj.transform, new Vector2(-42f, 0f));
+
+            GameObject labelObj = CreateText("Label", buttonObj.transform, labelStr, font, 24, primary ? Color.white : new Color(0.86f, 0.82f, 0.72f, 1f), Vector2.zero);
+            Text label = labelObj.GetComponent<Text>();
+            label.fontStyle = FontStyle.Bold;
+            RectTransform labelRect = labelObj.GetComponent<RectTransform>();
+            labelRect.anchorMin = Vector2.zero;
+            labelRect.anchorMax = Vector2.one;
+            labelRect.sizeDelta = Vector2.zero;
+            labelRect.anchoredPosition = Vector2.zero;
+
+            Button btn = buttonObj.GetComponent<Button>();
+            ColorBlock cb = btn.colors;
+            cb.normalColor = Color.white;
+            cb.highlightedColor = primary ? new Color(1f, 0.88f, 0.52f, 1f) : new Color(0.78f, 0.72f, 0.62f, 1f);
+            cb.pressedColor = primary ? new Color(0.78f, 0.22f, 0.08f, 1f) : new Color(0.36f, 0.34f, 0.3f, 1f);
+            cb.selectedColor = cb.highlightedColor;
+            btn.colors = cb;
+
+            return buttonObj;
+        }
+
+        private void CreateButtonStud(string name, Transform parent, Vector2 pos)
+        {
+            GameObject stud = new GameObject(name, typeof(Image));
+            stud.transform.SetParent(parent, false);
+            stud.GetComponent<Image>().color = new Color(0.78f, 0.66f, 0.42f, 0.95f);
+
+            RectTransform rect = stud.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(pos.x > 0f ? 0f : 1f, 0.5f);
+            rect.anchorMax = rect.anchorMin;
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(26f, 26f);
+            rect.anchoredPosition = pos;
         }
 
         private void HandleStateChanged(GameState newState)
@@ -315,6 +479,11 @@ namespace VikingRiverRowers
                 if (startHighScoreText != null && GameManager.Instance != null)
                 {
                     startHighScoreText.text = $"High Score: {Mathf.FloorToInt(GameManager.Instance.HighScore)}m";
+                }
+
+                if (menuStatusText != null)
+                {
+                    menuStatusText.text = "";
                 }
             }
             else if (state == GameState.RapidPhase)
@@ -398,6 +567,14 @@ namespace VikingRiverRowers
             if (milestoneMessageTimer <= 0f)
             {
                 milestoneMessageText.gameObject.SetActive(false);
+            }
+        }
+
+        private void ShowSwipeModeComingSoon()
+        {
+            if (menuStatusText != null)
+            {
+                menuStatusText.text = "SWIPE MODE - COMING SOON";
             }
         }
     }
