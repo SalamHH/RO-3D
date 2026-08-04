@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System;
+using System.Collections;
 
 namespace VikingRiverRowers
 {
@@ -30,7 +31,10 @@ namespace VikingRiverRowers
         [SerializeField] private Button swipeModeButton;
         [SerializeField] private Button restartButton;
 
+        private const float GameOverPanelDelay = 1f;
+
         private float milestoneMessageTimer;
+        private Coroutine gameOverRevealRoutine;
 
         private void Awake()
         {
@@ -60,6 +64,8 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged -= HandleStateChanged;
             GameManager.OnScoreUpdated -= HandleScoreUpdated;
             GameManager.OnBannerMessage -= HandleBannerMessage;
+
+            StopGameOverRevealRoutine();
         }
 
         private void Start()
@@ -468,10 +474,12 @@ namespace VikingRiverRowers
 
         private void UpdateUIState(GameState state)
         {
+            StopGameOverRevealRoutine();
+
             // Toggle panels
             if (startPanel != null) startPanel.SetActive(state == GameState.Menu);
             if (hudPanel != null) hudPanel.SetActive(state == GameState.Playing || state == GameState.RapidPhase);
-            if (gameOverPanel != null) gameOverPanel.SetActive(state == GameState.GameOver);
+            if (gameOverPanel != null) gameOverPanel.SetActive(false);
 
             // Special state modifications
             if (state == GameState.Menu)
@@ -507,7 +515,29 @@ namespace VikingRiverRowers
                     if (gameOverScoreText != null) gameOverScoreText.text = $"You rowed: {Mathf.FloorToInt(dist)} meters";
                     if (gameOverHighScoreText != null) gameOverHighScoreText.text = $"Best Distance: {Mathf.FloorToInt(GameManager.Instance.HighScore)} meters";
                 }
+
+                gameOverRevealRoutine = StartCoroutine(RevealGameOverPanelAfterDelay());
             }
+        }
+
+        private IEnumerator RevealGameOverPanelAfterDelay()
+        {
+            yield return new WaitForSeconds(GameOverPanelDelay);
+
+            if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.GameOver && gameOverPanel != null)
+            {
+                gameOverPanel.SetActive(true);
+            }
+
+            gameOverRevealRoutine = null;
+        }
+
+        private void StopGameOverRevealRoutine()
+        {
+            if (gameOverRevealRoutine == null) return;
+
+            StopCoroutine(gameOverRevealRoutine);
+            gameOverRevealRoutine = null;
         }
 
         private void Update()
