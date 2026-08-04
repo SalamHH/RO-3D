@@ -593,6 +593,9 @@ MonoBehaviour:
   trunkMaterial: {fileID: 0}
   foliageMaterial: {fileID: 0}
   foamMaterial: {fileID: 0}
+  natureTreeSourceMaterial: {fileID: 2100000, guid: cd07d8a28e2acb9468ecb30a6f45820b, type: 2}
+  natureRockSourceMaterial: {fileID: 2100000, guid: c6010fd8a9033e94399bc3b59a4be473, type: 2}
+  natureBankSourceMaterial: {fileID: 2100000, guid: ea94bc05f4e812349a43dff1264c21ec, type: 2}
 --- !u!4 &1722951525
 Transform:
   m_ObjectHideFlags: 0
