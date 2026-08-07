@@ -30,6 +30,7 @@ namespace VikingRiverRowers
         [SerializeField] private Button startButton;
         [SerializeField] private Button swipeModeButton;
         [SerializeField] private Button restartButton;
+        [SerializeField] private Button homeButton;
 
         private const float GameOverPanelDelay = 1f;
 
@@ -241,12 +242,19 @@ namespace VikingRiverRowers
             RectTransform goHSRect = goHSObj.GetComponent<RectTransform>();
             goHSRect.sizeDelta = new Vector2(650f, 56f);
 
-            // Restart Button
-            GameObject restartBtnObj = CreateVikingButton("RestartButton", gameOverFrame.transform, "ROW AGAIN", defaultFont, new Vector2(0f, -250f), true);
+            // Game Over Actions
+            GameObject restartBtnObj = CreateVikingButton("RestartButton", gameOverFrame.transform, "ROW AGAIN", defaultFont, new Vector2(0f, -220f), true);
             restartButton = restartBtnObj.GetComponent<Button>();
             restartButton.onClick.AddListener(() => {
                 if (ObstacleSpawner.Instance != null) ObstacleSpawner.Instance.ResetSpawner();
                 GameManager.Instance.RestartGame();
+            });
+
+            GameObject homeBtnObj = CreateVikingButton("HomeButton", gameOverFrame.transform, "HOME", defaultFont, new Vector2(0f, -315f), false);
+            homeButton = homeBtnObj.GetComponent<Button>();
+            homeButton.onClick.AddListener(() => {
+                if (ObstacleSpawner.Instance != null) ObstacleSpawner.Instance.ResetSpawner();
+                GameManager.Instance.ReturnToMenu();
             });
         }
 

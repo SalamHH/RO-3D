@@ -189,6 +189,23 @@ namespace VikingRiverRowers
             StartGame();
         }
 
+        public void ReturnToMenu()
+        {
+            DistanceTraveled = 0f;
+            activePlayTime = 0f;
+            nextRapidTimer = timeBetweenRapids;
+            nextMilestone = milestoneInterval;
+            CurrentLevel = Mathf.FloorToInt(baseSpeed / 5f) + 1;
+            lastAnnouncedLevel = CurrentLevel;
+
+            if (PlayerController.Instance != null)
+            {
+                PlayerController.Instance.ResetToMiddleLane();
+            }
+
+            SetState(GameState.Menu);
+        }
+
         private void SetState(GameState newState)
         {
             currentState = newState;
