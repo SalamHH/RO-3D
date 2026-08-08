@@ -124,7 +124,7 @@ namespace VikingRiverRowers
         {
             if (rapidStreaks == null) return;
 
-            bool rapidActive = currentState == GameState.RapidPhase;
+            bool rapidActive = currentState == GameState.RapidPhase || (GameManager.Instance != null && GameManager.Instance.IsSwipeSurging);
             if (streakContainer.gameObject.activeSelf != rapidActive)
             {
                 SetRapidStreaksActive(rapidActive);

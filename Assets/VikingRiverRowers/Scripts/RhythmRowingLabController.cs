@@ -83,6 +83,8 @@ namespace VikingRiverRowers
         private SwipeTrailView leftTrail;
         private SwipeTrailView rightTrail;
         private GameObject canvasObject;
+        private Image rowMeterFill;
+        private Text rowMeterText;
         private Text debugText;
         private Text judgmentText;
         private bool leftLastValid;
@@ -119,6 +121,7 @@ namespace VikingRiverRowers
             UpdateLane(RowingLane.Right, touchRouter.Right, rightEvaluator);
             UpdateTrails();
             UpdateVisuals();
+            UpdateRowMeterVisual();
             PublishStrokeProgress();
             UpdateDebugText();
         }
@@ -290,6 +293,8 @@ namespace VikingRiverRowers
             homeRect.offsetMax = Vector2.zero;
             homeButton.onClick.AddListener(() => GameManager.Instance.ReturnToMenu());
 
+            CreateRowMeter(canvasObject.transform, font);
+
             debugText = CreateText("RhythmDebugText", canvasObject.transform, font, 17, TextAnchor.LowerLeft, Color.white);
             RectTransform debugRect = debugText.rectTransform;
             debugRect.anchorMin = new Vector2(0.02f, 0.03f);
@@ -302,6 +307,58 @@ namespace VikingRiverRowers
         {
             leftEvaluator = new StrokeEvaluator(leftGuide.StartNormalized, leftGuide.EndNormalized, startZoneRadius, endZoneRadius, pathTolerance, minimumCompletion, minimumStrokeDurationSeconds, maxBackwardMotion, idealStrokeDurationSeconds, slowStrokeDurationSeconds);
             rightEvaluator = new StrokeEvaluator(rightGuide.StartNormalized, rightGuide.EndNormalized, startZoneRadius, endZoneRadius, pathTolerance, minimumCompletion, minimumStrokeDurationSeconds, maxBackwardMotion, idealStrokeDurationSeconds, slowStrokeDurationSeconds);
+        }
+
+        private void CreateRowMeter(Transform parent, Font font)
+        {
+            GameObject meterRoot = new GameObject("RowMeter", typeof(Image));
+            meterRoot.transform.SetParent(parent, false);
+            Image background = meterRoot.GetComponent<Image>();
+            background.color = new Color(0.06f, 0.07f, 0.08f, 0.74f);
+
+            RectTransform rootRect = meterRoot.GetComponent<RectTransform>();
+            rootRect.anchorMin = new Vector2(0.26f, 0.86f);
+            rootRect.anchorMax = new Vector2(0.74f, 0.905f);
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+
+            GameObject fillObj = new GameObject("Fill", typeof(Image));
+            fillObj.transform.SetParent(meterRoot.transform, false);
+            rowMeterFill = fillObj.GetComponent<Image>();
+            rowMeterFill.color = new Color(0.25f, 0.95f, 0.68f, 0.9f);
+            rowMeterFill.type = Image.Type.Filled;
+            rowMeterFill.fillMethod = Image.FillMethod.Horizontal;
+            rowMeterFill.fillOrigin = 0;
+            rowMeterFill.fillAmount = 0f;
+
+            RectTransform fillRect = fillObj.GetComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = new Vector2(6f, 6f);
+            fillRect.offsetMax = new Vector2(-6f, -6f);
+
+            rowMeterText = CreateText("Label", meterRoot.transform, font, 22, TextAnchor.MiddleCenter, Color.white);
+            rowMeterText.fontStyle = FontStyle.Bold;
+            RectTransform textRect = rowMeterText.rectTransform;
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+        }
+
+        private void UpdateRowMeterVisual()
+        {
+            if (GameManager.Instance == null || rowMeterFill == null || rowMeterText == null) return;
+
+            float fill = GameManager.Instance.IsSwipeSurging ? GameManager.Instance.SwipeSurgeRemaining01 : GameManager.Instance.RowMeter01;
+            rowMeterFill.fillAmount = fill;
+            rowMeterFill.color = GameManager.Instance.IsSwipeSurging
+                ? new Color(1f, 0.78f, 0.18f, 0.95f)
+                : new Color(0.25f, 0.95f, 0.68f, 0.9f);
+
+            rowMeterText.text = GameManager.Instance.IsSwipeSurging
+                ? $"SURGE {Mathf.CeilToInt(GameManager.Instance.SwipeSurgeRemaining01 * 100f)}%"
+                : $"ROW METER {Mathf.RoundToInt(GameManager.Instance.RowMeter01 * 100f)}%";
         }
 
         private PairedStrokeEvaluation EvaluatePair(StrokeEvaluation left, StrokeEvaluation right)

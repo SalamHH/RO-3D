@@ -31,6 +31,13 @@ namespace VikingRiverRowers
         [SerializeField] private float rapidPhaseDuration = 12f; // How long rapid phase lasts
         [SerializeField] private float rapidWarningLeadTime = 5f;
         [SerializeField] private float rapidSurvivalBonus = 100f;
+
+        [Header("Swipe Mode Surge")]
+        [SerializeField] private float perfectRowMeterGain = 0.2f;
+        [SerializeField] private float goodRowMeterGain = 0.1f;
+        [SerializeField] private float missRowMeterPenalty = 0.1f;
+        [SerializeField] private float swipeSurgeDuration = 3.5f;
+        [SerializeField] private float swipeSurgeSpeedMultiplier = 1.9f;
         
         [Header("Scoring")]
         [SerializeField] private float distanceScoreMultiplier = 2f; // Distance units per meter of scroll
@@ -46,10 +53,14 @@ namespace VikingRiverRowers
         public float RapidWarningLeadTime => rapidWarningLeadTime;
         public bool IsRapidIncoming => currentState == GameState.Playing && nextRapidTimer <= rapidWarningLeadTime;
         public string CurrentLevelName => GetLevelName(CurrentLevel);
+        public float RowMeter01 { get; private set; }
+        public bool IsSwipeSurging => currentState == GameState.RhythmLab && swipeSurgeTimer > 0f;
+        public float SwipeSurgeRemaining01 => swipeSurgeDuration <= 0f ? 0f : Mathf.Clamp01(swipeSurgeTimer / swipeSurgeDuration);
 
         // Timers
         private float nextRapidTimer;
         private float rapidPhaseTimer;
+        private float swipeSurgeTimer;
         private float activePlayTime;
         private float nextMilestone;
         private int lastAnnouncedLevel = 1;
@@ -96,6 +107,16 @@ namespace VikingRiverRowers
             SetState(GameState.Menu);
         }
 
+        private void OnEnable()
+        {
+            RhythmRowingLabController.OnPairedStrokeEvaluated += HandleRhythmPairedStrokeEvaluated;
+        }
+
+        private void OnDisable()
+        {
+            RhythmRowingLabController.OnPairedStrokeEvaluated -= HandleRhythmPairedStrokeEvaluated;
+        }
+
         private void Update()
         {
             if (currentState == GameState.Playing || currentState == GameState.RapidPhase)
@@ -132,6 +153,10 @@ namespace VikingRiverRowers
                 CheckMilestones();
                 OnScoreUpdated?.Invoke();
             }
+            else if (currentState == GameState.RhythmLab)
+            {
+                UpdateSwipeModeProgression();
+            }
             else
             {
                 CurrentSpeed = 0f;
@@ -144,6 +169,8 @@ namespace VikingRiverRowers
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
             nextMilestone = milestoneInterval;
+            RowMeter01 = 0f;
+            swipeSurgeTimer = 0f;
             CurrentLevel = Mathf.FloorToInt(baseSpeed / 5f) + 1;
             lastAnnouncedLevel = CurrentLevel;
 
@@ -197,6 +224,8 @@ namespace VikingRiverRowers
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
             nextMilestone = milestoneInterval;
+            RowMeter01 = 0f;
+            swipeSurgeTimer = 0f;
             CurrentLevel = Mathf.FloorToInt(baseSpeed / 5f) + 1;
             lastAnnouncedLevel = CurrentLevel;
 
@@ -219,6 +248,8 @@ namespace VikingRiverRowers
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
             nextMilestone = milestoneInterval;
+            RowMeter01 = 0f;
+            swipeSurgeTimer = 0f;
             CurrentLevel = Mathf.FloorToInt(baseSpeed / 5f) + 1;
             lastAnnouncedLevel = CurrentLevel;
 
@@ -242,6 +273,57 @@ namespace VikingRiverRowers
         {
             currentState = newState;
             OnStateChanged?.Invoke(currentState);
+        }
+
+        private void HandleRhythmPairedStrokeEvaluated(float rowQuality01, string label)
+        {
+            if (currentState != GameState.RhythmLab) return;
+
+            if (label == "Perfect")
+            {
+                RowMeter01 += perfectRowMeterGain;
+            }
+            else if (label == "Good")
+            {
+                RowMeter01 += goodRowMeterGain;
+            }
+            else
+            {
+                RowMeter01 -= missRowMeterPenalty;
+            }
+
+            RowMeter01 = Mathf.Clamp01(RowMeter01);
+            if (RowMeter01 >= 1f)
+            {
+                RowMeter01 = 0f;
+                swipeSurgeTimer = swipeSurgeDuration;
+                OnBannerMessage?.Invoke("ROW SURGE!");
+            }
+
+            OnScoreUpdated?.Invoke();
+        }
+
+        private void UpdateSwipeModeProgression()
+        {
+            activePlayTime += Time.deltaTime;
+            float dynamicBaseSpeed = Mathf.Min(baseSpeed + (activePlayTime * speedIncreaseRate), maxBaseSpeed);
+            CurrentLevel = Mathf.FloorToInt(dynamicBaseSpeed / 5f) + 1;
+            CurrentSpeed = swipeSurgeTimer > 0f ? dynamicBaseSpeed * swipeSurgeSpeedMultiplier : dynamicBaseSpeed;
+
+            if (swipeSurgeTimer > 0f)
+            {
+                swipeSurgeTimer -= Time.deltaTime;
+                if (swipeSurgeTimer <= 0f)
+                {
+                    swipeSurgeTimer = 0f;
+                    CurrentSpeed = dynamicBaseSpeed;
+                    OnBannerMessage?.Invoke("SURGE ENDED");
+                }
+            }
+
+            DistanceTraveled += CurrentSpeed * distanceScoreMultiplier * Time.deltaTime;
+            CheckMilestones();
+            OnScoreUpdated?.Invoke();
         }
 
         private void CheckMilestones()

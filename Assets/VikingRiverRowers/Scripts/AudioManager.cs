@@ -53,6 +53,7 @@ namespace VikingRiverRowers
         private float rowTimer;
         private float rapidDrumTimer;
         private GameState currentState = GameState.Menu;
+        private bool wasSwipeSurging;
         private readonly System.Random noiseRandom = new System.Random(7219);
 
         private void Awake()
@@ -91,6 +92,8 @@ namespace VikingRiverRowers
 
         private void Update()
         {
+            UpdateSwipeSurgeAudio();
+
             if (currentState != GameState.Playing && currentState != GameState.RapidPhase) return;
             if (!enableRowingSound && !enableRapidDrums) return;
 
@@ -160,6 +163,23 @@ namespace VikingRiverRowers
                 }
             }
             else
+            {
+                StopRapidChant();
+                wasSwipeSurging = false;
+            }
+        }
+
+        private void UpdateSwipeSurgeAudio()
+        {
+            bool isSwipeSurging = currentState == GameState.RhythmLab && GameManager.Instance != null && GameManager.Instance.IsSwipeSurging;
+            if (isSwipeSurging == wasSwipeSurging) return;
+
+            wasSwipeSurging = isSwipeSurging;
+            if (isSwipeSurging)
+            {
+                PlayRapidChant();
+            }
+            else if (currentState == GameState.RhythmLab)
             {
                 StopRapidChant();
             }

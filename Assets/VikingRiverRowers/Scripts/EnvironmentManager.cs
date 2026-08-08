@@ -14,6 +14,7 @@ namespace VikingRiverRowers
         [SerializeField] private int segmentCount = 10;
         [SerializeField] private float segmentLength = 20f;
         [SerializeField] private float startZOffset = -60f; // Starts well behind the camera so no trailing edge is visible.
+        [SerializeField] private float waterTextureFlowMultiplier = 0.035f;
 
         [Header("Materials")]
         [SerializeField] private Material waterMaterial;
@@ -34,6 +35,7 @@ namespace VikingRiverRowers
         private Material natureBankMaterial;
         private GameObject[] segments;
         private float totalLength;
+        private Vector2 waterTextureOffset;
 
         private void Awake()
         {
@@ -405,6 +407,7 @@ namespace VikingRiverRowers
             if (segments == null) return;
 
             float scrollSpeed = GameManager.Instance.CurrentSpeed;
+            AnimateWaterSurface(scrollSpeed);
             if (scrollSpeed <= 0f) return;
 
             // Scroll all segments in -Z
@@ -424,6 +427,24 @@ namespace VikingRiverRowers
                 }
 
                 segments[i].transform.position = pos;
+            }
+        }
+
+        private void AnimateWaterSurface(float scrollSpeed)
+        {
+            if (waterMaterial == null || scrollSpeed <= 0f) return;
+
+            waterTextureOffset.y -= scrollSpeed * waterTextureFlowMultiplier * Time.deltaTime;
+            waterMaterial.mainTextureOffset = waterTextureOffset;
+
+            if (waterMaterial.HasProperty("_BaseMap"))
+            {
+                waterMaterial.SetTextureOffset("_BaseMap", waterTextureOffset);
+            }
+
+            if (waterMaterial.HasProperty("_MainTex"))
+            {
+                waterMaterial.SetTextureOffset("_MainTex", waterTextureOffset);
             }
         }
 
