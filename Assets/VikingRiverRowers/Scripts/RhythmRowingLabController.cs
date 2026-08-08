@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -42,6 +43,10 @@ namespace VikingRiverRowers
 
     public class RhythmRowingLabController : MonoBehaviour
     {
+        public static event Action<float, float, bool, bool> OnStrokeProgressChanged;
+        public static event Action<RowingLane, float, bool> OnHandStrokeReleased;
+        public static event Action<float, string> OnPairedStrokeEvaluated;
+
         [Header("Guide Layout")]
         [SerializeField, Range(0.05f, 0.45f)] private float leftGuideX = 0.28f;
         [SerializeField, Range(0.55f, 0.95f)] private float rightGuideX = 0.72f;
@@ -114,6 +119,7 @@ namespace VikingRiverRowers
             UpdateLane(RowingLane.Right, touchRouter.Right, rightEvaluator);
             UpdateTrails();
             UpdateVisuals();
+            PublishStrokeProgress();
             UpdateDebugText();
         }
 
@@ -134,7 +140,12 @@ namespace VikingRiverRowers
                 lastPair = PairedStrokeEvaluation.Idle;
                 leftTrail.Reset();
                 rightTrail.Reset();
+                OnStrokeProgressChanged?.Invoke(0f, 0f, false, false);
                 SetJudgment("Swipe from start to finish");
+            }
+            else
+            {
+                OnStrokeProgressChanged?.Invoke(0f, 0f, false, false);
             }
         }
 
@@ -166,6 +177,7 @@ namespace VikingRiverRowers
                 }
 
                 UpdatePairJudgment(lane, result);
+                OnHandStrokeReleased?.Invoke(lane, result.quality01, result.valid);
             }
         }
 
@@ -176,6 +188,7 @@ namespace VikingRiverRowers
             {
                 lastPair = EvaluatePair(lastLeftStroke, lastRightStroke);
                 SetJudgment($"{lastPair.label}  Row Quality {Mathf.RoundToInt(lastPair.rowQuality01 * 100f)}%");
+                OnPairedStrokeEvaluated?.Invoke(lastPair.rowQuality01, lastPair.label);
                 return;
             }
 
@@ -189,6 +202,15 @@ namespace VikingRiverRowers
             StrokeEvaluation rightEval = rightEvaluator.CurrentEvaluation;
             leftGuide.UpdateVisual(leftEval.progress01, touchRouter.Left.isActive, leftLastValid);
             rightGuide.UpdateVisual(rightEval.progress01, touchRouter.Right.isActive, rightLastValid);
+        }
+
+        private void PublishStrokeProgress()
+        {
+            StrokeEvaluation leftEval = leftEvaluator.CurrentEvaluation;
+            StrokeEvaluation rightEval = rightEvaluator.CurrentEvaluation;
+            float leftProgress = touchRouter.Left.isActive ? leftEval.progress01 : 0f;
+            float rightProgress = touchRouter.Right.isActive ? rightEval.progress01 : 0f;
+            OnStrokeProgressChanged?.Invoke(leftProgress, rightProgress, touchRouter.Left.isActive, touchRouter.Right.isActive);
         }
 
         private void UpdateTrails()

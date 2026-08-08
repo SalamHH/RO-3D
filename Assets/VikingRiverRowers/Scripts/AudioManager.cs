@@ -21,6 +21,7 @@ namespace VikingRiverRowers
         [SerializeField] private bool enableRapidDrums = false;
         [SerializeField] private bool enableRapidChant = true;
         [SerializeField] private bool enableBoostSound = false;
+        [SerializeField] private bool enableRhythmStrokeSound = true;
         [SerializeField] private bool enableRapidHorn = false;
         [SerializeField] private bool enableCrashSound = false;
         [SerializeField] private bool enableStartSound = false;
@@ -77,6 +78,7 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged += HandleStateChanged;
             PlayerController.OnBoosted += PlayBoostSplash;
             PlayerController.OnLaneChanged += PlayLaneWhoosh;
+            RhythmRowingLabController.OnHandStrokeReleased += PlayRhythmStrokeSplash;
         }
 
         private void OnDisable()
@@ -84,6 +86,7 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged -= HandleStateChanged;
             PlayerController.OnBoosted -= PlayBoostSplash;
             PlayerController.OnLaneChanged -= PlayLaneWhoosh;
+            RhythmRowingLabController.OnHandStrokeReleased -= PlayRhythmStrokeSplash;
         }
 
         private void Update()
@@ -272,6 +275,18 @@ namespace VikingRiverRowers
             if (!enableBoostSound) return;
 
             PlayOneShot(sfxSource, boostSplashClip, sfxVolume, Random.Range(0.96f, 1.08f));
+        }
+
+        private void PlayRhythmStrokeSplash(RowingLane lane, float quality01, bool valid)
+        {
+            if (currentState != GameState.RhythmLab) return;
+            if (!enableRhythmStrokeSound) return;
+
+            float quality = valid ? Mathf.Clamp01(quality01) : 0.22f;
+            float lanePitch = lane == RowingLane.Left ? -0.03f : 0.03f;
+            float pitch = Mathf.Lerp(0.88f, 1.16f, quality) + lanePitch;
+            float volume = sfxVolume * Mathf.Lerp(0.35f, 0.95f, quality);
+            PlayOneShot(sfxSource, boostSplashClip, volume, pitch);
         }
 
         private void PlayLaneWhoosh()

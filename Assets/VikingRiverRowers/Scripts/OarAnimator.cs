@@ -18,6 +18,7 @@ namespace VikingRiverRowers
         [SerializeField] private float swingAngle = 14f;  // Yaw rotation forward/back (swinging)
         [SerializeField] private float dipAngle = 13f;    // Vertical blade travel into and out of the water
         [SerializeField] private float dipOffset = 7f;    // Positive angle lowers both outer blades toward the water
+        [SerializeField] private float manualReturnSpeed = 8f;
 
         [Header("Procedural Fallback Oars")]
         [SerializeField] private bool useProceduralOars = true;
@@ -33,6 +34,20 @@ namespace VikingRiverRowers
         private Quaternion[] rightOarStartRotations;
 
         private float currentPhase = 0f;
+        private float targetLeftProgress;
+        private float targetRightProgress;
+        private float currentLeftProgress;
+        private float currentRightProgress;
+
+        private void OnEnable()
+        {
+            RhythmRowingLabController.OnStrokeProgressChanged += HandleStrokeProgressChanged;
+        }
+
+        private void OnDisable()
+        {
+            RhythmRowingLabController.OnStrokeProgressChanged -= HandleStrokeProgressChanged;
+        }
 
         private void Start()
         {
@@ -185,6 +200,12 @@ namespace VikingRiverRowers
         {
             if (GameManager.Instance == null) return;
 
+            if (GameManager.Instance.CurrentState == GameState.RhythmLab)
+            {
+                UpdateManualStrokeAnimation();
+                return;
+            }
+
             // Determine rowing speed modifier
             float speedMultiplier = 1f;
             if (GameManager.Instance.CurrentState == GameState.RapidPhase)
@@ -230,6 +251,40 @@ namespace VikingRiverRowers
                 float rotZ = -dip;
 
                 rightOars[i].localRotation = rightOarStartRotations[i] * Quaternion.Euler(rotX, rotY, rotZ);
+            }
+        }
+
+        private void HandleStrokeProgressChanged(float leftProgress, float rightProgress, bool leftActive, bool rightActive)
+        {
+            targetLeftProgress = leftActive ? leftProgress : 0f;
+            targetRightProgress = rightActive ? rightProgress : 0f;
+        }
+
+        private void UpdateManualStrokeAnimation()
+        {
+            currentLeftProgress = Mathf.Lerp(currentLeftProgress, targetLeftProgress, manualReturnSpeed * Time.deltaTime);
+            currentRightProgress = Mathf.Lerp(currentRightProgress, targetRightProgress, manualReturnSpeed * Time.deltaTime);
+
+            AnimateManualSide(leftOars, leftOarStartRotations, currentLeftProgress, true);
+            AnimateManualSide(rightOars, rightOarStartRotations, currentRightProgress, false);
+        }
+
+        private void AnimateManualSide(Transform[] oars, Quaternion[] startRotations, float progress, bool isLeft)
+        {
+            if (oars == null || startRotations == null) return;
+
+            float stroke = Mathf.Clamp01(progress);
+            float swingVal = Mathf.Lerp(-1f, 1f, stroke);
+            float bladeInWater = Mathf.Sin(stroke * Mathf.PI);
+            float dip = (bladeInWater * dipAngle) + dipOffset;
+
+            for (int i = 0; i < oars.Length; i++)
+            {
+                if (oars[i] == null || i >= startRotations.Length) continue;
+
+                float rotY = (isLeft ? swingVal : -swingVal) * swingAngle;
+                float rotZ = isLeft ? dip : -dip;
+                oars[i].localRotation = startRotations[i] * Quaternion.Euler(0f, rotY, rotZ);
             }
         }
     }

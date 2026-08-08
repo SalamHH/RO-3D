@@ -28,6 +28,9 @@ namespace VikingRiverRowers
         [SerializeField] private float laneKickAngle = 12f;
         [SerializeField] private float boostPitchKickAngle = 8f;
         [SerializeField] private float feedbackReturnSpeed = 12f;
+        [SerializeField] private float rhythmImbalanceRollAngle = 8f;
+        [SerializeField] private float rhythmStrokePitchAngle = 4f;
+        [SerializeField] private float rhythmPairPitchKickAngle = 5f;
 
         [Header("Rapid Phase Pushback")]
         [SerializeField] private float pushbackSpeed = 1.6f; // Speed of drift backward
@@ -47,6 +50,9 @@ namespace VikingRiverRowers
         private float currentTilt = 0f;   // Smoothly lerped roll tilt
         private float laneKick;
         private float boostPitchKick;
+        private float rhythmLeftProgress;
+        private float rhythmRightProgress;
+        private float rhythmPairPitchKick;
 
         // Swipe processing variables
         private Vector2 touchStartPos;
@@ -73,6 +79,18 @@ namespace VikingRiverRowers
             ResetToMiddleLane();
         }
 
+        private void OnEnable()
+        {
+            RhythmRowingLabController.OnStrokeProgressChanged += HandleRhythmStrokeProgress;
+            RhythmRowingLabController.OnPairedStrokeEvaluated += HandleRhythmPairedStroke;
+        }
+
+        private void OnDisable()
+        {
+            RhythmRowingLabController.OnStrokeProgressChanged -= HandleRhythmStrokeProgress;
+            RhythmRowingLabController.OnPairedStrokeEvaluated -= HandleRhythmPairedStroke;
+        }
+
         private void Update()
         {
             if (GameManager.Instance == null) return;
@@ -83,11 +101,27 @@ namespace VikingRiverRowers
                 // Reset positions in Menu/GameOver
                 ApplyBobbing(0.5f); // Gentle bobbing in menu
                 currentZ = Mathf.MoveTowards(currentZ, 0f, zRecoverySpeed * Time.deltaTime);
+                rhythmPairPitchKick = Mathf.MoveTowards(rhythmPairPitchKick, 0f, feedbackReturnSpeed * Time.deltaTime);
                 Vector3 menuPos = transform.position;
                 menuPos.y = visualYOffset;
                 menuPos.z = currentZ;
                 menuPos.x = Mathf.SmoothDamp(menuPos.x, lanePositions[1], ref laneSwitchVelocity, laneSwitchSmoothTime);
                 transform.position = menuPos;
+
+                if (state == GameState.RhythmLab)
+                {
+                    float imbalance = rhythmRightProgress - rhythmLeftProgress;
+                    float strokeLoad = Mathf.Max(rhythmLeftProgress, rhythmRightProgress);
+                    float targetRoll = imbalance * rhythmImbalanceRollAngle;
+                    float rhythmFinalRoll = targetRoll + Mathf.Sin(Time.time * rollFrequency) * (rollAmplitude * 0.45f);
+                    float rhythmFinalPitch = rhythmPairPitchKick - (strokeLoad * rhythmStrokePitchAngle) + Mathf.Cos(Time.time * bobFrequency) * (rollAmplitude * 0.25f);
+                    transform.rotation = Quaternion.Euler(rhythmFinalPitch, 0f, rhythmFinalRoll);
+                }
+                else
+                {
+                    transform.rotation = Quaternion.identity;
+                }
+
                 return;
             }
 
@@ -280,9 +314,25 @@ namespace VikingRiverRowers
             boostPitchKick = 0f;
             IsBoosting = false;
             boostVisualTimer = 0f;
+            rhythmLeftProgress = 0f;
+            rhythmRightProgress = 0f;
+            rhythmPairPitchKick = 0f;
 
             transform.position = new Vector3(targetX, floatHeight, 0f);
             transform.rotation = Quaternion.identity;
+        }
+
+        private void HandleRhythmStrokeProgress(float leftProgress, float rightProgress, bool leftActive, bool rightActive)
+        {
+            rhythmLeftProgress = leftActive ? leftProgress : 0f;
+            rhythmRightProgress = rightActive ? rightProgress : 0f;
+        }
+
+        private void HandleRhythmPairedStroke(float rowQuality01, string label)
+        {
+            if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.RhythmLab) return;
+
+            rhythmPairPitchKick = -rhythmPairPitchKickAngle * Mathf.Clamp01(rowQuality01);
         }
 
         private void ApplyBobbing(float speedMultiplier)

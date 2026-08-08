@@ -18,6 +18,13 @@ namespace VikingRiverRowers
         [SerializeField] private float streakMinZ = -16f;
         [SerializeField] private float streakMaxZ = 46f;
 
+        [Header("Swipe Mode Feedback")]
+        [SerializeField] private float rhythmSplashSideOffset = 0.95f;
+        [SerializeField] private float rhythmSplashBackOffset = 0.55f;
+        [SerializeField] private int rhythmMinSplashParticles = 8;
+        [SerializeField] private int rhythmMaxSplashParticles = 30;
+        [SerializeField] private bool enableMobileHaptics = true;
+
         private Camera targetCamera;
         private Vector3 cameraStartLocalPosition;
         private Quaternion cameraStartLocalRotation;
@@ -55,6 +62,8 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged += HandleStateChanged;
             PlayerController.OnBoosted += HandleBoosted;
             PlayerController.OnLaneChanged += HandleLaneChanged;
+            RhythmRowingLabController.OnHandStrokeReleased += HandleRhythmHandStrokeReleased;
+            RhythmRowingLabController.OnPairedStrokeEvaluated += HandleRhythmPairedStrokeEvaluated;
         }
 
         private void OnDisable()
@@ -62,6 +71,8 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged -= HandleStateChanged;
             PlayerController.OnBoosted -= HandleBoosted;
             PlayerController.OnLaneChanged -= HandleLaneChanged;
+            RhythmRowingLabController.OnHandStrokeReleased -= HandleRhythmHandStrokeReleased;
+            RhythmRowingLabController.OnPairedStrokeEvaluated -= HandleRhythmPairedStrokeEvaluated;
         }
 
         private void LateUpdate()
@@ -174,6 +185,33 @@ namespace VikingRiverRowers
 
         private void HandleLaneChanged()
         {
+        }
+
+        private void HandleRhythmHandStrokeReleased(RowingLane lane, float quality01, bool valid)
+        {
+            if (currentState != GameState.RhythmLab) return;
+
+            float quality = valid ? Mathf.Clamp01(quality01) : 0.18f;
+            int particleCount = Mathf.RoundToInt(Mathf.Lerp(rhythmMinSplashParticles, rhythmMaxSplashParticles, quality));
+            float side = lane == RowingLane.Left ? -rhythmSplashSideOffset : rhythmSplashSideOffset;
+            Vector3 position = GetPlayerEffectPosition() + new Vector3(side, -0.08f, -rhythmSplashBackOffset);
+            PlayParticleBurst(boostSplash, position, particleCount);
+        }
+
+        private void HandleRhythmPairedStrokeEvaluated(float rowQuality01, string label)
+        {
+            if (currentState != GameState.RhythmLab) return;
+
+            float quality = Mathf.Clamp01(rowQuality01);
+            if (quality >= 0.68f)
+            {
+                Shake(Mathf.Lerp(0.08f, 0.18f, quality), Mathf.Lerp(0.02f, 0.07f, quality));
+            }
+
+            if (enableMobileHaptics && quality >= 0.78f && (Application.isMobilePlatform || Application.platform == RuntimePlatform.IPhonePlayer))
+            {
+                Handheld.Vibrate();
+            }
         }
 
         private bool IsRunningState()
