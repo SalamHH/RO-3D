@@ -125,7 +125,7 @@ namespace VikingRiverRowers
 
             GameObject swipeBtnObj = CreateVikingButton("SwipeModeButton", menuFrame.transform, "SWIPE MODE", defaultFont, new Vector2(0f, -145f), false);
             swipeModeButton = swipeBtnObj.GetComponent<Button>();
-            swipeModeButton.onClick.AddListener(ShowSwipeModeComingSoon);
+            swipeModeButton.onClick.AddListener(() => GameManager.Instance.StartSwipeMode());
 
             GameObject statusObj = CreateText("MenuStatus", menuFrame.transform, "", defaultFont, 22, new Color(0.9f, 0.74f, 0.45f, 1f), new Vector2(0f, -285f));
             menuStatusText = statusObj.GetComponent<Text>();

@@ -78,7 +78,7 @@ namespace VikingRiverRowers
             if (GameManager.Instance == null) return;
 
             GameState state = GameManager.Instance.CurrentState;
-            if (state == GameState.GameOver || state == GameState.Menu)
+            if (state == GameState.GameOver || state == GameState.Menu || state == GameState.RhythmLab)
             {
                 // Reset positions in Menu/GameOver
                 ApplyBobbing(0.5f); // Gentle bobbing in menu

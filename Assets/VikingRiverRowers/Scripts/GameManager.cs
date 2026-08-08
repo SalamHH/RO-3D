@@ -8,6 +8,7 @@ namespace VikingRiverRowers
         Menu,
         Playing,
         RapidPhase,
+        RhythmLab,
         GameOver
     }
 
@@ -71,6 +72,7 @@ namespace VikingRiverRowers
             HighScore = PlayerPrefs.GetFloat("Viking_HighScore", 0f);
             EnsureAudioManager();
             EnsureFeedbackManager();
+            EnsureRhythmRowingLab();
         }
 
         private void EnsureAudioManager()
@@ -189,6 +191,28 @@ namespace VikingRiverRowers
             StartGame();
         }
 
+        public void StartSwipeMode()
+        {
+            DistanceTraveled = 0f;
+            activePlayTime = 0f;
+            nextRapidTimer = timeBetweenRapids;
+            nextMilestone = milestoneInterval;
+            CurrentLevel = Mathf.FloorToInt(baseSpeed / 5f) + 1;
+            lastAnnouncedLevel = CurrentLevel;
+
+            if (ObstacleSpawner.Instance != null)
+            {
+                ObstacleSpawner.Instance.ResetSpawner();
+            }
+
+            if (PlayerController.Instance != null)
+            {
+                PlayerController.Instance.ResetToMiddleLane();
+            }
+
+            SetState(GameState.RhythmLab);
+        }
+
         public void ReturnToMenu()
         {
             DistanceTraveled = 0f;
@@ -204,6 +228,14 @@ namespace VikingRiverRowers
             }
 
             SetState(GameState.Menu);
+        }
+
+        private void EnsureRhythmRowingLab()
+        {
+            if (FindAnyObjectByType<RhythmRowingLabController>() != null) return;
+
+            GameObject labObj = new GameObject("RhythmRowingLabController");
+            labObj.AddComponent<RhythmRowingLabController>();
         }
 
         private void SetState(GameState newState)
