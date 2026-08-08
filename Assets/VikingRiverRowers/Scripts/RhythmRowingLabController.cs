@@ -5,6 +5,41 @@ using UnityEngine.UI;
 
 namespace VikingRiverRowers
 {
+    public struct PairedStrokeEvaluation
+    {
+        public static readonly PairedStrokeEvaluation Idle = Create("Idle", 0f, 0f, 0f, 0f, 0f, 0f);
+        public static readonly PairedStrokeEvaluation Waiting = Create("Waiting", 0f, 0f, 0f, 0f, 0f, 0f);
+
+        public string label;
+        public float rowQuality01;
+        public float coordinationQuality01;
+        public float startMatch01;
+        public float releaseMatch01;
+        public float lengthMatch01;
+        public float speedMatch01;
+
+        public static PairedStrokeEvaluation Create(
+            string label,
+            float rowQuality01,
+            float coordinationQuality01,
+            float startMatch01,
+            float releaseMatch01,
+            float lengthMatch01,
+            float speedMatch01)
+        {
+            return new PairedStrokeEvaluation
+            {
+                label = label,
+                rowQuality01 = rowQuality01,
+                coordinationQuality01 = coordinationQuality01,
+                startMatch01 = startMatch01,
+                releaseMatch01 = releaseMatch01,
+                lengthMatch01 = lengthMatch01,
+                speedMatch01 = speedMatch01
+            };
+        }
+    }
+
     public class RhythmRowingLabController : MonoBehaviour
     {
         [Header("Guide Layout")]
@@ -14,12 +49,20 @@ namespace VikingRiverRowers
         [SerializeField, Range(0.12f, 0.45f)] private float guideEndY = 0.26f;
 
         [Header("Stroke Validation")]
-        [SerializeField, Range(0.02f, 0.18f)] private float startZoneRadius = 0.045f;
-        [SerializeField, Range(0.02f, 0.18f)] private float endZoneRadius = 0.045f;
-        [SerializeField, Range(0.02f, 0.18f)] private float pathTolerance = 0.035f;
+        [SerializeField, Range(0.02f, 0.18f)] private float startZoneRadius = 0.09f;
+        [SerializeField, Range(0.02f, 0.18f)] private float endZoneRadius = 0.09f;
+        [SerializeField, Range(0.05f, 0.35f)] private float pathTolerance = 0.2f;
         [SerializeField, Range(0.25f, 1f)] private float minimumCompletion = 0.9f;
         [SerializeField, Range(0.05f, 0.5f)] private float minimumStrokeDurationSeconds = 0.12f;
         [SerializeField, Range(0f, 0.4f)] private float maxBackwardMotion = 0.08f;
+
+        [Header("Phase 2 Quality")]
+        [SerializeField, Range(0.15f, 1.2f)] private float idealStrokeDurationSeconds = 0.42f;
+        [SerializeField, Range(0.3f, 2f)] private float slowStrokeDurationSeconds = 0.9f;
+        [SerializeField, Range(0.02f, 0.5f)] private float pairedStartWindowSeconds = 0.18f;
+        [SerializeField, Range(0.02f, 0.5f)] private float pairedReleaseWindowSeconds = 0.22f;
+        [SerializeField, Range(0.02f, 0.5f)] private float pairedLengthWindow = 0.18f;
+        [SerializeField, Range(0.02f, 0.8f)] private float pairedSpeedWindowSeconds = 0.28f;
 
         [Header("Swipe Trails")]
         [SerializeField, Range(6, 40)] private int trailPointCount = 22;
@@ -39,6 +82,9 @@ namespace VikingRiverRowers
         private Text judgmentText;
         private bool leftLastValid;
         private bool rightLastValid;
+        private StrokeEvaluation lastLeftStroke;
+        private StrokeEvaluation lastRightStroke;
+        private PairedStrokeEvaluation lastPair;
 
         private void Awake()
         {
@@ -83,6 +129,9 @@ namespace VikingRiverRowers
                 rightEvaluator.Reset();
                 leftLastValid = false;
                 rightLastValid = false;
+                lastLeftStroke = default;
+                lastRightStroke = default;
+                lastPair = PairedStrokeEvaluation.Idle;
                 leftTrail.Reset();
                 rightTrail.Reset();
                 SetJudgment("Swipe from start to finish");
@@ -93,7 +142,7 @@ namespace VikingRiverRowers
         {
             if (touchState.startedThisFrame)
             {
-                evaluator.Begin(touchState.startNormalized);
+                evaluator.Begin(touchState.startNormalized, touchState.startDspTime);
             }
 
             if (touchState.isActive)
@@ -108,14 +157,30 @@ namespace VikingRiverRowers
                 if (lane == RowingLane.Left)
                 {
                     leftLastValid = result.valid;
+                    lastLeftStroke = result;
                 }
                 else
                 {
                     rightLastValid = result.valid;
+                    lastRightStroke = result;
                 }
 
-                SetJudgment($"{lane}: {result.label}");
+                UpdatePairJudgment(lane, result);
             }
+        }
+
+        private void UpdatePairJudgment(RowingLane lane, StrokeEvaluation result)
+        {
+            StrokeEvaluation other = lane == RowingLane.Left ? lastRightStroke : lastLeftStroke;
+            if (other.finished && Mathf.Abs(result.endDspTime - other.endDspTime) <= pairedReleaseWindowSeconds * 2.2f)
+            {
+                lastPair = EvaluatePair(lastLeftStroke, lastRightStroke);
+                SetJudgment($"{lastPair.label}  Row Quality {Mathf.RoundToInt(lastPair.rowQuality01 * 100f)}%");
+                return;
+            }
+
+            lastPair = PairedStrokeEvaluation.Waiting;
+            SetJudgment($"{lane}: {result.label}  waiting for pair");
         }
 
         private void UpdateVisuals()
@@ -141,11 +206,12 @@ namespace VikingRiverRowers
             debugText.text =
                 "Swipe from the upper circle to the lower circle.\n" +
                 $"Left touch: {DescribeTouch(touchRouter.Left)}  Progress: {leftEval.progress01:0.00}  Valid: {leftEval.valid}\n" +
-                $"Left checks: start {leftEval.startedInZone}, end {leftEval.endedInZone}, path {leftEval.stayedOnPath}, complete {leftEval.completedEnough}, forward {leftEval.movedForwardEnough}, duration {leftEval.durationOk}\n" +
-                $"Left values: final {leftEval.finalProgress01:0.00}, deviation {leftEval.maxDeviation01:0.000}, end distance {leftEval.endDistance01:0.000}, backtrack {leftEval.backwardMotion01:0.00}\n" +
+                $"Left valid: start {leftEval.startedInZone}, end {leftEval.endedInZone}, path {leftEval.stayedOnPath}\n" +
+                $"Left quality: hand {leftEval.quality01:0.00}, path {leftEval.pathAccuracy01:0.00}, complete {leftEval.completionQuality01:0.00}, forward {leftEval.forwardQuality01:0.00}, speed {leftEval.speedQuality01:0.00}\n" +
                 $"Right touch: {DescribeTouch(touchRouter.Right)}  Progress: {rightEval.progress01:0.00}  Valid: {rightEval.valid}\n" +
-                $"Right checks: start {rightEval.startedInZone}, end {rightEval.endedInZone}, path {rightEval.stayedOnPath}, complete {rightEval.completedEnough}, forward {rightEval.movedForwardEnough}, duration {rightEval.durationOk}\n" +
-                $"Right values: final {rightEval.finalProgress01:0.00}, deviation {rightEval.maxDeviation01:0.000}, end distance {rightEval.endDistance01:0.000}, backtrack {rightEval.backwardMotion01:0.00}";
+                $"Right valid: start {rightEval.startedInZone}, end {rightEval.endedInZone}, path {rightEval.stayedOnPath}\n" +
+                $"Right quality: hand {rightEval.quality01:0.00}, path {rightEval.pathAccuracy01:0.00}, complete {rightEval.completionQuality01:0.00}, forward {rightEval.forwardQuality01:0.00}, speed {rightEval.speedQuality01:0.00}\n" +
+                $"Pair: {lastPair.label} row {lastPair.rowQuality01:0.00}, coordination {lastPair.coordinationQuality01:0.00}, start {lastPair.startMatch01:0.00}, release {lastPair.releaseMatch01:0.00}, length {lastPair.lengthMatch01:0.00}, speed {lastPair.speedMatch01:0.00}";
         }
 
         private string DescribeTouch(LaneTouchState state)
@@ -173,13 +239,13 @@ namespace VikingRiverRowers
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
 
-            GameObject leftLane = CreateLaneArea("LeftRowingLane", canvasObject.transform, new Vector2(0f, 0f), new Vector2(0.5f, 1f), new Color(0.08f, 0.42f, 0.62f, 0.17f));
-            GameObject rightLane = CreateLaneArea("RightRowingLane", canvasObject.transform, new Vector2(0.5f, 0f), new Vector2(1f, 1f), new Color(0.62f, 0.25f, 0.08f, 0.17f));
+            GameObject leftLane = CreateLaneArea("LeftRowingLane", canvasObject.transform, new Vector2(0f, 0f), new Vector2(0.5f, 0.52f), new Color(0.08f, 0.42f, 0.62f, 0.08f));
+            GameObject rightLane = CreateLaneArea("RightRowingLane", canvasObject.transform, new Vector2(0.5f, 0f), new Vector2(1f, 0.52f), new Color(0.62f, 0.25f, 0.08f, 0.08f));
             leftLane.transform.SetAsFirstSibling();
             rightLane.transform.SetAsFirstSibling();
 
-            leftGuide = new StrokeGuideView(canvasObject.transform, "LeftStrokeGuide", new Vector2(leftGuideX, guideStartY), new Vector2(leftGuideX, guideEndY), new Color(0.24f, 0.78f, 1f, 1f));
-            rightGuide = new StrokeGuideView(canvasObject.transform, "RightStrokeGuide", new Vector2(rightGuideX, guideStartY), new Vector2(rightGuideX, guideEndY), new Color(1f, 0.52f, 0.22f, 1f));
+            leftGuide = new StrokeGuideView(canvasObject.transform, "LeftStrokeGuide", new Vector2(leftGuideX, guideStartY), new Vector2(leftGuideX, guideEndY), startZoneRadius, endZoneRadius, pathTolerance, new Color(0.24f, 0.78f, 1f, 1f));
+            rightGuide = new StrokeGuideView(canvasObject.transform, "RightStrokeGuide", new Vector2(rightGuideX, guideStartY), new Vector2(rightGuideX, guideEndY), startZoneRadius, endZoneRadius, pathTolerance, new Color(1f, 0.52f, 0.22f, 1f));
             leftTrail = new SwipeTrailView(canvasObject.transform, "LeftSwipeTrail", new Color(0.18f, 0.92f, 1f, 0.95f), trailPointCount, trailLifetime, trailMinPointDistance, trailWidth);
             rightTrail = new SwipeTrailView(canvasObject.transform, "RightSwipeTrail", new Color(1f, 0.36f, 0.12f, 0.95f), trailPointCount, trailLifetime, trailMinPointDistance, trailWidth);
             leftGuide.SetAsLastSibling();
@@ -212,8 +278,41 @@ namespace VikingRiverRowers
 
         private void ConfigureEvaluators()
         {
-            leftEvaluator = new StrokeEvaluator(leftGuide.StartNormalized, leftGuide.EndNormalized, startZoneRadius, endZoneRadius, pathTolerance, minimumCompletion, minimumStrokeDurationSeconds, maxBackwardMotion);
-            rightEvaluator = new StrokeEvaluator(rightGuide.StartNormalized, rightGuide.EndNormalized, startZoneRadius, endZoneRadius, pathTolerance, minimumCompletion, minimumStrokeDurationSeconds, maxBackwardMotion);
+            leftEvaluator = new StrokeEvaluator(leftGuide.StartNormalized, leftGuide.EndNormalized, startZoneRadius, endZoneRadius, pathTolerance, minimumCompletion, minimumStrokeDurationSeconds, maxBackwardMotion, idealStrokeDurationSeconds, slowStrokeDurationSeconds);
+            rightEvaluator = new StrokeEvaluator(rightGuide.StartNormalized, rightGuide.EndNormalized, startZoneRadius, endZoneRadius, pathTolerance, minimumCompletion, minimumStrokeDurationSeconds, maxBackwardMotion, idealStrokeDurationSeconds, slowStrokeDurationSeconds);
+        }
+
+        private PairedStrokeEvaluation EvaluatePair(StrokeEvaluation left, StrokeEvaluation right)
+        {
+            if (!left.valid || !right.valid)
+            {
+                float oneSidedQuality = Mathf.Max(left.quality01, right.quality01) * 0.2f;
+                return PairedStrokeEvaluation.Create(oneSidedQuality > 0f ? "Uneven" : "Miss", oneSidedQuality, 0f, 0f, 0f, 0f, 0f);
+            }
+
+            float startMatch = 1f - Mathf.Clamp01(Mathf.Abs(left.startDspTime - right.startDspTime) / pairedStartWindowSeconds);
+            float releaseMatch = 1f - Mathf.Clamp01(Mathf.Abs(left.endDspTime - right.endDspTime) / pairedReleaseWindowSeconds);
+            float lengthMatch = 1f - Mathf.Clamp01(Mathf.Abs(left.finalProgress01 - right.finalProgress01) / pairedLengthWindow);
+            float speedMatch = 1f - Mathf.Clamp01(Mathf.Abs(left.durationSeconds - right.durationSeconds) / pairedSpeedWindowSeconds);
+            float coordination = Mathf.Clamp01(
+                (startMatch * 0.4f) +
+                (releaseMatch * 0.25f) +
+                (lengthMatch * 0.2f) +
+                (speedMatch * 0.15f)
+            );
+
+            float handQuality = Mathf.Sqrt(left.quality01 * right.quality01);
+            float rowQuality = Mathf.Clamp01((handQuality * 0.75f) + (coordination * 0.25f));
+            string label = GetPairLabel(rowQuality, coordination);
+            return PairedStrokeEvaluation.Create(label, rowQuality, coordination, startMatch, releaseMatch, lengthMatch, speedMatch);
+        }
+
+        private static string GetPairLabel(float rowQuality, float coordination)
+        {
+            if (rowQuality >= 0.88f && coordination >= 0.78f) return "Perfect";
+            if (rowQuality >= 0.68f) return "Good";
+            if (rowQuality >= 0.35f) return "Uneven";
+            return "Miss";
         }
 
         private void SetLabActive(bool active)

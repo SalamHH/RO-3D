@@ -11,14 +11,23 @@ namespace VikingRiverRowers
         private readonly RectTransform path;
         private readonly Image startImage;
         private readonly Image fillImage;
+        private readonly float startRadius;
+        private readonly float endRadius;
+        private readonly float pathTolerance;
+        private const float TargetVisualScale = 0.58f;
+        private const float TrackVisualScale = 0.34f;
+        private const float FillVisualScale = 0.62f;
 
         public Vector2 StartNormalized { get; private set; }
         public Vector2 EndNormalized { get; private set; }
 
-        public StrokeGuideView(Transform parent, string name, Vector2 startNormalized, Vector2 endNormalized, Color laneColor)
+        public StrokeGuideView(Transform parent, string name, Vector2 startNormalized, Vector2 endNormalized, float startRadius, float endRadius, float pathTolerance, Color laneColor)
         {
             StartNormalized = startNormalized;
             EndNormalized = endNormalized;
+            this.startRadius = startRadius;
+            this.endRadius = endRadius;
+            this.pathTolerance = pathTolerance;
 
             GameObject rootObj = new GameObject(name, typeof(RectTransform));
             rootObj.transform.SetParent(parent, false);
@@ -69,24 +78,24 @@ namespace VikingRiverRowers
             path.anchorMax = startAnchor;
             path.pivot = new Vector2(0.5f, 0.5f);
             path.anchoredPosition = Vector2.zero;
-            path.sizeDelta = new Vector2(16f, 0f);
+            path.sizeDelta = new Vector2(GetTrackWidth(), 0f);
 
             startCircle.anchorMin = startAnchor;
             startCircle.anchorMax = startAnchor;
             startCircle.anchoredPosition = Vector2.zero;
-            startCircle.sizeDelta = new Vector2(86f, 86f);
+            startCircle.sizeDelta = Vector2.one * RadiusToCanvasDiameter(startRadius) * TargetVisualScale;
 
             endCircle.anchorMin = endAnchor;
             endCircle.anchorMax = endAnchor;
             endCircle.anchoredPosition = Vector2.zero;
-            endCircle.sizeDelta = new Vector2(92f, 92f);
+            endCircle.sizeDelta = Vector2.one * RadiusToCanvasDiameter(endRadius) * TargetVisualScale;
 
             RectTransform fillRect = fillImage.rectTransform;
             fillRect.anchorMin = startAnchor;
             fillRect.anchorMax = startAnchor;
             fillRect.pivot = new Vector2(0.5f, 1f);
             fillRect.anchoredPosition = Vector2.zero;
-            fillRect.sizeDelta = new Vector2(24f, 0f);
+            fillRect.sizeDelta = new Vector2(GetFillWidth(), 0f);
         }
 
         private void SetVerticalFill(float progress01)
@@ -94,7 +103,7 @@ namespace VikingRiverRowers
             Vector2 startAnchor = ToSafeAnchor(StartNormalized);
             Vector2 endAnchor = ToSafeAnchor(EndNormalized);
             float length = Mathf.Abs(startAnchor.y - endAnchor.y) * root.rect.height;
-            fillImage.rectTransform.sizeDelta = new Vector2(24f, length * Mathf.Clamp01(progress01));
+            fillImage.rectTransform.sizeDelta = new Vector2(GetFillWidth(), length * Mathf.Clamp01(progress01));
         }
 
         private static Image CreateImage(string name, Transform parent, Color color)
@@ -104,6 +113,28 @@ namespace VikingRiverRowers
             Image image = obj.GetComponent<Image>();
             image.color = color;
             return image;
+        }
+
+        private float RadiusToCanvasDiameter(float radius)
+        {
+            Rect safeArea = Screen.safeArea;
+            if (safeArea.width <= 0f || safeArea.height <= 0f)
+            {
+                safeArea = new Rect(0f, 0f, Screen.width, Screen.height);
+            }
+
+            float screenHeight = Mathf.Max(1f, Screen.height);
+            return radius * 2f * (safeArea.height / screenHeight) * root.rect.height;
+        }
+
+        private float GetTrackWidth()
+        {
+            return Mathf.Max(24f, GetGuideLength() * pathTolerance * root.rect.height * 2f * TrackVisualScale);
+        }
+
+        private float GetFillWidth()
+        {
+            return GetTrackWidth() * FillVisualScale;
         }
 
         private static Vector2 ToSafeAnchor(Vector2 normalized)
@@ -124,6 +155,13 @@ namespace VikingRiverRowers
             );
 
             return safeNormalized;
+        }
+
+        private float GetGuideLength()
+        {
+            Vector2 startAnchor = ToSafeAnchor(StartNormalized);
+            Vector2 endAnchor = ToSafeAnchor(EndNormalized);
+            return Vector2.Distance(startAnchor, endAnchor);
         }
     }
 }
