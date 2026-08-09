@@ -1,8 +1,5 @@
 using UnityEngine;
 using Bitgem.VFX.StylisedWater;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 namespace VikingRiverRowers
 {
@@ -24,12 +21,12 @@ namespace VikingRiverRowers
         [SerializeField] private Material foamMaterial;
 
         [Header("A Piece Of Nature Assets")]
+        [SerializeField] private GameObject natureTreePrefab;
+        [SerializeField] private GameObject[] natureRockPrefabs;
         [SerializeField] private Material natureTreeSourceMaterial;
         [SerializeField] private Material natureRockSourceMaterial;
         [SerializeField] private Material natureBankSourceMaterial;
 
-        private GameObject natureTreePrefab;
-        private GameObject[] natureRockPrefabs;
         private Material natureTreeMaterial;
         private Material natureRockMaterial;
         private Material natureBankMaterial;
@@ -50,7 +47,6 @@ namespace VikingRiverRowers
         private void Start()
         {
             totalLength = segmentCount * segmentLength;
-            LoadNaturePrefabs();
             CreateMaterials();
             ConfigureSceneEnvironment();
             SpawnSegments();
@@ -384,21 +380,6 @@ namespace VikingRiverRowers
             {
                 Destroy(colliders[i]);
             }
-        }
-
-        private void LoadNaturePrefabs()
-        {
-#if UNITY_EDITOR
-            natureTreePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/A_piece_of_nature/Prefabs/Pine_tree.prefab");
-            natureRockPrefabs = new[]
-            {
-                AssetDatabase.LoadAssetAtPath<GameObject>("Assets/A_piece_of_nature/Prefabs/Rock_3.prefab"),
-                AssetDatabase.LoadAssetAtPath<GameObject>("Assets/A_piece_of_nature/Prefabs/Rock_4.prefab")
-            };
-#else
-            natureTreePrefab = null;
-            natureRockPrefabs = null;
-#endif
         }
 
         private void Update()
