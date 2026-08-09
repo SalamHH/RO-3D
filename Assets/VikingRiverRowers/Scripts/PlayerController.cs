@@ -53,6 +53,7 @@ namespace VikingRiverRowers
         private float rhythmLeftProgress;
         private float rhythmRightProgress;
         private float rhythmPairPitchKick;
+        private float rhythmHitRollKick;
 
         // Swipe processing variables
         private Vector2 touchStartPos;
@@ -60,6 +61,7 @@ namespace VikingRiverRowers
 
         // Boost events for animator syncing
         public bool IsBoosting { get; private set; }
+        public int CurrentLaneIndex => currentLane;
         public float RapidDanger01 => Mathf.Clamp01(Mathf.Abs(currentZ) / Mathf.Abs(minZLimit));
         private float boostVisualTimer;
 
@@ -102,10 +104,12 @@ namespace VikingRiverRowers
                 ApplyBobbing(0.5f); // Gentle bobbing in menu
                 currentZ = Mathf.MoveTowards(currentZ, 0f, zRecoverySpeed * Time.deltaTime);
                 rhythmPairPitchKick = Mathf.MoveTowards(rhythmPairPitchKick, 0f, feedbackReturnSpeed * Time.deltaTime);
+                rhythmHitRollKick = Mathf.MoveTowards(rhythmHitRollKick, 0f, feedbackReturnSpeed * Time.deltaTime);
                 Vector3 menuPos = transform.position;
                 menuPos.y = visualYOffset;
                 menuPos.z = currentZ;
-                menuPos.x = Mathf.SmoothDamp(menuPos.x, lanePositions[1], ref laneSwitchVelocity, laneSwitchSmoothTime);
+                float rhythmTargetX = state == GameState.RhythmLab ? lanePositions[currentLane] : lanePositions[1];
+                menuPos.x = Mathf.SmoothDamp(menuPos.x, rhythmTargetX, ref laneSwitchVelocity, laneSwitchSmoothTime);
                 transform.position = menuPos;
 
                 if (state == GameState.RhythmLab)
@@ -113,7 +117,7 @@ namespace VikingRiverRowers
                     float imbalance = rhythmRightProgress - rhythmLeftProgress;
                     float strokeLoad = Mathf.Max(rhythmLeftProgress, rhythmRightProgress);
                     float targetRoll = imbalance * rhythmImbalanceRollAngle;
-                    float rhythmFinalRoll = targetRoll + Mathf.Sin(Time.time * rollFrequency) * (rollAmplitude * 0.45f);
+                    float rhythmFinalRoll = targetRoll + rhythmHitRollKick + Mathf.Sin(Time.time * rollFrequency) * (rollAmplitude * 0.45f);
                     float rhythmFinalPitch = rhythmPairPitchKick - (strokeLoad * rhythmStrokePitchAngle) + Mathf.Cos(Time.time * bobFrequency) * (rollAmplitude * 0.25f);
                     transform.rotation = Quaternion.Euler(rhythmFinalPitch, 0f, rhythmFinalRoll);
                 }
@@ -317,9 +321,19 @@ namespace VikingRiverRowers
             rhythmLeftProgress = 0f;
             rhythmRightProgress = 0f;
             rhythmPairPitchKick = 0f;
+            rhythmHitRollKick = 0f;
 
             transform.position = new Vector3(targetX, floatHeight, 0f);
             transform.rotation = Quaternion.identity;
+        }
+
+        public void ApplyRhythmSteering(RowingLane lane)
+        {
+            if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.RhythmLab) return;
+
+            int direction = lane == RowingLane.Left ? -1 : 1;
+            currentLane = Mathf.Clamp(currentLane + direction, 0, lanePositions.Length - 1);
+            rhythmHitRollKick = -direction * (laneKickAngle * 0.45f);
         }
 
         private void HandleRhythmStrokeProgress(float leftProgress, float rightProgress, bool leftActive, bool rightActive)
@@ -355,6 +369,23 @@ namespace VikingRiverRowers
             // Colliding with obstacles triggers Game Over
             if (other.CompareTag("Obstacle"))
             {
+                if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.RhythmLab)
+                {
+                    bool runContinues = GameManager.Instance.HandleSwipeObstacleHit();
+                    rhythmHitRollKick = transform.position.x >= 0f ? -laneKickAngle : laneKickAngle;
+
+                    if (runContinues)
+                    {
+                        Obstacle obstacle = other.GetComponentInParent<Obstacle>();
+                        if (obstacle != null)
+                        {
+                            Destroy(obstacle.gameObject);
+                        }
+                    }
+
+                    return;
+                }
+
                 GameManager.Instance.TriggerGameOver();
             }
         }

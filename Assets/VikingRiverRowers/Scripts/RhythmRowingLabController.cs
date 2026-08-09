@@ -89,6 +89,9 @@ namespace VikingRiverRowers
         private Text judgmentText;
         private bool leftLastValid;
         private bool rightLastValid;
+        private bool leftSteeringStrokeThisFrame;
+        private bool rightSteeringStrokeThisFrame;
+        private bool pairedStrokeEvaluatedThisFrame;
         private StrokeEvaluation lastLeftStroke;
         private StrokeEvaluation lastRightStroke;
         private PairedStrokeEvaluation lastPair;
@@ -116,9 +119,14 @@ namespace VikingRiverRowers
         {
             if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.RhythmLab) return;
 
+            leftSteeringStrokeThisFrame = false;
+            rightSteeringStrokeThisFrame = false;
+            pairedStrokeEvaluatedThisFrame = false;
+
             touchRouter.UpdateTouches();
             UpdateLane(RowingLane.Left, touchRouter.Left, leftEvaluator);
             UpdateLane(RowingLane.Right, touchRouter.Right, rightEvaluator);
+            ApplySingleSideSteeringAfterLaneUpdates();
             UpdateTrails();
             UpdateVisuals();
             UpdateRowMeterVisual();
@@ -181,6 +189,17 @@ namespace VikingRiverRowers
 
                 UpdatePairJudgment(lane, result);
                 OnHandStrokeReleased?.Invoke(lane, result.quality01, result.valid);
+                if (result.valid)
+                {
+                    if (lane == RowingLane.Left)
+                    {
+                        leftSteeringStrokeThisFrame = true;
+                    }
+                    else
+                    {
+                        rightSteeringStrokeThisFrame = true;
+                    }
+                }
             }
         }
 
@@ -191,6 +210,7 @@ namespace VikingRiverRowers
             {
                 lastPair = EvaluatePair(lastLeftStroke, lastRightStroke);
                 SetJudgment($"{lastPair.label}  Row Quality {Mathf.RoundToInt(lastPair.rowQuality01 * 100f)}%");
+                pairedStrokeEvaluatedThisFrame = true;
                 OnPairedStrokeEvaluated?.Invoke(lastPair.rowQuality01, lastPair.label);
                 return;
             }
@@ -203,8 +223,22 @@ namespace VikingRiverRowers
         {
             StrokeEvaluation leftEval = leftEvaluator.CurrentEvaluation;
             StrokeEvaluation rightEval = rightEvaluator.CurrentEvaluation;
+            leftGuide.SetEmphasized(false);
+            rightGuide.SetEmphasized(false);
             leftGuide.UpdateVisual(leftEval.progress01, touchRouter.Left.isActive, leftLastValid);
             rightGuide.UpdateVisual(rightEval.progress01, touchRouter.Right.isActive, rightLastValid);
+        }
+
+        private void ApplySingleSideSteeringAfterLaneUpdates()
+        {
+            if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.RhythmLab) return;
+            if (PlayerController.Instance == null) return;
+            if (pairedStrokeEvaluatedThisFrame) return;
+            if (touchRouter.Left.isActive || touchRouter.Right.isActive) return;
+
+            if (leftSteeringStrokeThisFrame == rightSteeringStrokeThisFrame) return;
+
+            PlayerController.Instance.ApplyRhythmSteering(leftSteeringStrokeThisFrame ? RowingLane.Left : RowingLane.Right);
         }
 
         private void PublishStrokeProgress()

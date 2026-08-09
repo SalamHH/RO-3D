@@ -9,11 +9,15 @@ namespace VikingRiverRowers
         private readonly RectTransform startCircle;
         private readonly RectTransform endCircle;
         private readonly RectTransform path;
+        private readonly Image pathImage;
         private readonly Image startImage;
+        private readonly Image endImage;
         private readonly Image fillImage;
+        private readonly Color laneColor;
         private readonly float startRadius;
         private readonly float endRadius;
         private readonly float pathTolerance;
+        private bool isEmphasized;
         private const float TargetVisualScale = 0.58f;
         private const float TrackVisualScale = 0.34f;
         private const float FillVisualScale = 0.62f;
@@ -25,6 +29,7 @@ namespace VikingRiverRowers
         {
             StartNormalized = startNormalized;
             EndNormalized = endNormalized;
+            this.laneColor = laneColor;
             this.startRadius = startRadius;
             this.endRadius = endRadius;
             this.pathTolerance = pathTolerance;
@@ -37,10 +42,12 @@ namespace VikingRiverRowers
             root.offsetMin = Vector2.zero;
             root.offsetMax = Vector2.zero;
 
-            path = CreateImage("Path", root, new Color(laneColor.r, laneColor.g, laneColor.b, 0.42f)).rectTransform;
+            pathImage = CreateImage("Path", root, new Color(laneColor.r, laneColor.g, laneColor.b, 0.42f));
+            path = pathImage.rectTransform;
             startImage = CreateImage("StartCircle", root, new Color(laneColor.r, laneColor.g, laneColor.b, 0.9f));
             startCircle = startImage.rectTransform;
-            endCircle = CreateImage("EndCircle", root, new Color(1f, 1f, 1f, 0.34f)).rectTransform;
+            endImage = CreateImage("EndCircle", root, new Color(1f, 1f, 1f, 0.34f));
+            endCircle = endImage.rectTransform;
             fillImage = CreateImage("ProgressFill", root, new Color(1f, 0.85f, 0.32f, 0.8f));
             fillImage.rectTransform.SetAsLastSibling();
 
@@ -57,13 +64,31 @@ namespace VikingRiverRowers
             root.SetAsLastSibling();
         }
 
+        public void SetEmphasized(bool emphasized)
+        {
+            isEmphasized = emphasized;
+        }
+
         public void UpdateVisual(float strokeProgress01, bool activeTouch, bool lastValid)
         {
-            startCircle.localScale = activeTouch ? Vector3.one * 1.12f : Vector3.one;
+            float emphasisScale = isEmphasized ? 1.28f : 1f;
+            startCircle.localScale = (activeTouch ? Vector3.one * 1.12f : Vector3.one) * emphasisScale;
+            endCircle.localScale = Vector3.one * emphasisScale;
 
             Color startColor = startImage.color;
-            startColor.a = activeTouch ? 1f : 0.82f;
+            startColor.r = isEmphasized ? 1f : laneColor.r;
+            startColor.g = isEmphasized ? 0.92f : laneColor.g;
+            startColor.b = isEmphasized ? 0.18f : laneColor.b;
+            startColor.a = activeTouch || isEmphasized ? 1f : 0.82f;
             startImage.color = startColor;
+
+            pathImage.color = isEmphasized
+                ? new Color(1f, 0.9f, 0.16f, 0.72f)
+                : new Color(laneColor.r, laneColor.g, laneColor.b, 0.42f);
+
+            endImage.color = isEmphasized
+                ? new Color(1f, 0.96f, 0.55f, 0.62f)
+                : new Color(1f, 1f, 1f, 0.34f);
 
             fillImage.color = lastValid ? new Color(0.45f, 1f, 0.68f, 0.82f) : new Color(1f, 0.85f, 0.32f, 0.82f);
             SetVerticalFill(strokeProgress01);

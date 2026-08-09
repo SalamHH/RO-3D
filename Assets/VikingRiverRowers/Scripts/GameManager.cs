@@ -36,7 +36,7 @@ namespace VikingRiverRowers
         [SerializeField] private float perfectRowMeterGain = 0.2f;
         [SerializeField] private float goodRowMeterGain = 0.1f;
         [SerializeField] private float missRowMeterPenalty = 0.1f;
-        [SerializeField] private float swipeSurgeDuration = 3.5f;
+        [SerializeField] private float swipeSurgeDuration = 7f;
         [SerializeField] private float swipeSurgeSpeedMultiplier = 1.9f;
         
         [Header("Scoring")]
@@ -64,6 +64,7 @@ namespace VikingRiverRowers
         private float activePlayTime;
         private float nextMilestone;
         private int lastAnnouncedLevel = 1;
+        private bool lastRunWasSwipeMode;
 
         // Events
         public static event Action<GameState> OnStateChanged;
@@ -165,6 +166,7 @@ namespace VikingRiverRowers
 
         public void StartGame()
         {
+            lastRunWasSwipeMode = false;
             DistanceTraveled = 0f;
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
@@ -215,11 +217,19 @@ namespace VikingRiverRowers
 
         public void RestartGame()
         {
-            StartGame();
+            if (lastRunWasSwipeMode)
+            {
+                StartSwipeMode();
+            }
+            else
+            {
+                StartGame();
+            }
         }
 
         public void StartSwipeMode()
         {
+            lastRunWasSwipeMode = true;
             DistanceTraveled = 0f;
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
@@ -244,6 +254,7 @@ namespace VikingRiverRowers
 
         public void ReturnToMenu()
         {
+            lastRunWasSwipeMode = false;
             DistanceTraveled = 0f;
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
@@ -301,6 +312,22 @@ namespace VikingRiverRowers
             }
 
             OnScoreUpdated?.Invoke();
+        }
+
+        public bool HandleSwipeObstacleHit()
+        {
+            if (currentState != GameState.RhythmLab) return false;
+
+            if (swipeSurgeTimer > 0f)
+            {
+                swipeSurgeTimer = 0f;
+                OnBannerMessage?.Invoke("SURGE BROKEN");
+                OnScoreUpdated?.Invoke();
+                return true;
+            }
+
+            TriggerGameOver();
+            return false;
         }
 
         private void UpdateSwipeModeProgression()
