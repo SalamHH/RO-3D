@@ -25,10 +25,13 @@ namespace VikingRiverRowers
         [SerializeField] private bool enableRapidHorn = false;
         [SerializeField] private bool enableCrashSound = false;
         [SerializeField] private bool enableStartSound = false;
+        [SerializeField] private bool enableButtonClickSound = true;
 
         [Header("Audio Assets")]
         [SerializeField] private AudioClip rapidChantClip;
         [SerializeField] private string rapidChantAssetPath = "Audio/RO chant.wav";
+        [SerializeField] private AudioClip buttonClickClip;
+        [SerializeField] private string buttonClickResourcePath = "Audio/water splash button";
 
         [Header("Rhythm")]
         [SerializeField] private float normalRowInterval = 0.48f;
@@ -72,6 +75,7 @@ namespace VikingRiverRowers
             surgeSource = CreateSource("SurgeSource");
 
             BuildClips();
+            LoadAudioAssets();
         }
 
         private void OnEnable()
@@ -317,6 +321,13 @@ namespace VikingRiverRowers
             PlayOneShot(sfxSource, laneWhooshClip, sfxVolume * 0.65f, Random.Range(0.95f, 1.08f));
         }
 
+        public void PlayButtonClick()
+        {
+            if (!enableButtonClickSound) return;
+
+            PlayOneShot(sfxSource, buttonClickClip, sfxVolume * 0.85f, Random.Range(0.96f, 1.04f));
+        }
+
         private void PlayOneShot(AudioSource source, AudioClip clip, float volume, float pitch)
         {
             if (clip == null) return;
@@ -383,6 +394,14 @@ namespace VikingRiverRowers
                 float overtone = Mathf.Sin(2f * Mathf.PI * 880f * time) * 0.45f;
                 return (tone + overtone) * envelope * 0.25f;
             });
+        }
+
+        private void LoadAudioAssets()
+        {
+            if (buttonClickClip == null && !string.IsNullOrWhiteSpace(buttonClickResourcePath))
+            {
+                buttonClickClip = Resources.Load<AudioClip>(buttonClickResourcePath);
+            }
         }
 
         private AudioClip CreateClip(string clipName, float duration, System.Func<float, float, float> sampleGenerator)

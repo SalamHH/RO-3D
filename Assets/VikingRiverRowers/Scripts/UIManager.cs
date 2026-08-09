@@ -118,6 +118,8 @@ namespace VikingRiverRowers
             GameObject startHSObj = CreateText("HighScore", menuFrame.transform, "High Score: 0m", defaultFont, 25, new Color(0.78f, 0.92f, 1f, 1f), new Vector2(0f, 75f));
             startHighScoreText = startHSObj.GetComponent<Text>();
             startHighScoreText.alignment = TextAnchor.MiddleCenter;
+            RectTransform startHSRect = startHSObj.GetComponent<RectTransform>();
+            startHSRect.sizeDelta = new Vector2(760f, 54f);
 
             GameObject startBtnObj = CreateVikingButton("StartButton", menuFrame.transform, "NORMAL VOYAGE", defaultFont, new Vector2(0f, -35f), true);
             startButton = startBtnObj.GetComponent<Button>();
@@ -232,6 +234,7 @@ namespace VikingRiverRowers
             GameObject goScoreObj = CreateText("GOScore", gameOverFrame.transform, "Distance: 0m", defaultFont, 28, Color.white, new Vector2(0f, 45f));
             gameOverScoreText = goScoreObj.GetComponent<Text>();
             gameOverScoreText.alignment = TextAnchor.MiddleCenter;
+            gameOverScoreText.verticalOverflow = VerticalWrapMode.Overflow;
             RectTransform goScoreRect = goScoreObj.GetComponent<RectTransform>();
             goScoreRect.sizeDelta = new Vector2(650f, 60f);
 
@@ -375,6 +378,7 @@ namespace VikingRiverRowers
             labelRect.anchoredPosition = Vector2.zero;
 
             Button btn = buttonObj.GetComponent<Button>();
+            btn.onClick.AddListener(() => AudioManager.Instance?.PlayButtonClick());
             
             // Add a little highlight color transition
             ColorBlock cb = btn.colors;
@@ -430,6 +434,7 @@ namespace VikingRiverRowers
             labelRect.anchoredPosition = Vector2.zero;
 
             Button btn = buttonObj.GetComponent<Button>();
+            btn.onClick.AddListener(() => AudioManager.Instance?.PlayButtonClick());
             ColorBlock cb = btn.colors;
             cb.normalColor = Color.white;
             cb.highlightedColor = primary ? new Color(1f, 0.88f, 0.52f, 1f) : new Color(0.78f, 0.72f, 0.62f, 1f);
@@ -494,7 +499,7 @@ namespace VikingRiverRowers
             {
                 if (startHighScoreText != null && GameManager.Instance != null)
                 {
-                    startHighScoreText.text = $"High Score: {Mathf.FloorToInt(GameManager.Instance.HighScore)}m";
+                    startHighScoreText.text = $"Voyage Best: {Mathf.FloorToInt(GameManager.Instance.HighScore)}m   Swipe Best: {Mathf.FloorToInt(GameManager.Instance.SwipeHighScore)}m";
                 }
 
                 if (menuStatusText != null)
@@ -520,8 +525,32 @@ namespace VikingRiverRowers
                 if (GameManager.Instance != null)
                 {
                     float dist = GameManager.Instance.DistanceTraveled;
-                    if (gameOverScoreText != null) gameOverScoreText.text = $"You rowed: {Mathf.FloorToInt(dist)} meters";
-                    if (gameOverHighScoreText != null) gameOverHighScoreText.text = $"Best Distance: {Mathf.FloorToInt(GameManager.Instance.HighScore)} meters";
+                    if (GameManager.Instance.LastRunWasSwipeMode)
+                    {
+                        if (gameOverScoreText != null)
+                        {
+                            gameOverScoreText.text =
+                                $"Swipe distance: {Mathf.FloorToInt(dist)} meters\n" +
+                                $"Row Quality: {Mathf.RoundToInt(GameManager.Instance.SwipeAverageRowQuality01 * 100f)}%   Perfect Streak: {GameManager.Instance.SwipeLongestPerfectStreak}";
+                            gameOverScoreText.rectTransform.sizeDelta = new Vector2(650f, 96f);
+                            gameOverScoreText.rectTransform.anchoredPosition = new Vector2(0f, 34f);
+                        }
+
+                        if (gameOverHighScoreText != null) gameOverHighScoreText.text = $"Swipe best: {Mathf.FloorToInt(GameManager.Instance.SwipeHighScore)} meters";
+                        if (gameOverHighScoreText != null) gameOverHighScoreText.rectTransform.anchoredPosition = new Vector2(0f, -62f);
+                    }
+                    else
+                    {
+                        if (gameOverScoreText != null)
+                        {
+                            gameOverScoreText.text = $"You rowed: {Mathf.FloorToInt(dist)} meters";
+                            gameOverScoreText.rectTransform.sizeDelta = new Vector2(650f, 60f);
+                            gameOverScoreText.rectTransform.anchoredPosition = new Vector2(0f, 45f);
+                        }
+
+                        if (gameOverHighScoreText != null) gameOverHighScoreText.text = $"Best Distance: {Mathf.FloorToInt(GameManager.Instance.HighScore)} meters";
+                        if (gameOverHighScoreText != null) gameOverHighScoreText.rectTransform.anchoredPosition = new Vector2(0f, -18f);
+                    }
                 }
 
                 gameOverRevealRoutine = StartCoroutine(RevealGameOverPanelAfterDelay());

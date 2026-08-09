@@ -11,6 +11,8 @@ namespace VikingRiverRowers
         [SerializeField] private float rapidShakeStrength = 0.12f;
         [SerializeField] private float crashShakeDuration = 0.55f;
         [SerializeField] private float crashShakeStrength = 0.22f;
+        [SerializeField] private float rhythmCameraSideOffset = 1.45f;
+        [SerializeField] private float rhythmCameraOffsetSmoothTime = 0.16f;
 
         [Header("Water Motion")]
         [SerializeField] private int rapidStreakCount = 20;
@@ -31,6 +33,8 @@ namespace VikingRiverRowers
         private float shakeTimer;
         private float shakeDuration;
         private float shakeStrength;
+        private float rhythmCameraOffsetX;
+        private float rhythmCameraOffsetVelocity;
 
         private ParticleSystem boostSplash;
         private ParticleSystem crashBurst;
@@ -101,7 +105,7 @@ namespace VikingRiverRowers
 
             if (shakeTimer <= 0f)
             {
-                targetCamera.transform.localPosition = cameraStartLocalPosition;
+                targetCamera.transform.localPosition = GetCameraBaseLocalPosition();
                 targetCamera.transform.localRotation = cameraStartLocalRotation;
                 shakeStrength = 0f;
                 return;
@@ -112,12 +116,24 @@ namespace VikingRiverRowers
             Vector3 offset = Random.insideUnitSphere * (shakeStrength * falloff);
             offset.z *= 0.2f;
 
-            targetCamera.transform.localPosition = cameraStartLocalPosition + offset;
+            targetCamera.transform.localPosition = GetCameraBaseLocalPosition() + offset;
             targetCamera.transform.localRotation = cameraStartLocalRotation * Quaternion.Euler(
                 Random.Range(-0.6f, 0.6f) * shakeStrength * 10f * falloff,
                 0f,
                 Random.Range(-1f, 1f) * shakeStrength * 10f * falloff
             );
+        }
+
+        private Vector3 GetCameraBaseLocalPosition()
+        {
+            float targetOffsetX = 0f;
+            if (currentState == GameState.RhythmLab && PlayerController.Instance != null)
+            {
+                targetOffsetX = (PlayerController.Instance.CurrentLaneIndex - 1) * rhythmCameraSideOffset;
+            }
+
+            rhythmCameraOffsetX = Mathf.SmoothDamp(rhythmCameraOffsetX, targetOffsetX, ref rhythmCameraOffsetVelocity, rhythmCameraOffsetSmoothTime);
+            return cameraStartLocalPosition + Vector3.right * rhythmCameraOffsetX;
         }
 
         private void UpdateRapidStreaks()

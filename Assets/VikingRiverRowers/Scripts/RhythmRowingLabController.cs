@@ -75,6 +75,9 @@ namespace VikingRiverRowers
         [SerializeField, Range(0.002f, 0.05f)] private float trailMinPointDistance = 0.012f;
         [SerializeField, Range(8f, 60f)] private float trailWidth = 28f;
 
+        [Header("Debug")]
+        [SerializeField] private bool showDebugPanel;
+
         private TwoThumbLaneRouter touchRouter;
         private StrokeEvaluator leftEvaluator;
         private StrokeEvaluator rightEvaluator;
@@ -85,6 +88,8 @@ namespace VikingRiverRowers
         private GameObject canvasObject;
         private Image rowMeterFill;
         private Text rowMeterText;
+        private Text distanceText;
+        private Text phaseText;
         private Text debugText;
         private Text judgmentText;
         private bool leftLastValid;
@@ -130,6 +135,7 @@ namespace VikingRiverRowers
             UpdateTrails();
             UpdateVisuals();
             UpdateRowMeterVisual();
+            UpdateCleanHud();
             PublishStrokeProgress();
             UpdateDebugText();
         }
@@ -260,6 +266,8 @@ namespace VikingRiverRowers
 
         private void UpdateDebugText()
         {
+            if (!showDebugPanel || debugText == null) return;
+
             StrokeEvaluation leftEval = leftEvaluator.CurrentEvaluation;
             StrokeEvaluation rightEval = rightEvaluator.CurrentEvaluation;
             debugText.text =
@@ -328,6 +336,7 @@ namespace VikingRiverRowers
             homeButton.onClick.AddListener(() => GameManager.Instance.ReturnToMenu());
 
             CreateRowMeter(canvasObject.transform, font);
+            CreateCleanHud(canvasObject.transform, font);
 
             debugText = CreateText("RhythmDebugText", canvasObject.transform, font, 17, TextAnchor.LowerLeft, Color.white);
             RectTransform debugRect = debugText.rectTransform;
@@ -335,6 +344,7 @@ namespace VikingRiverRowers
             debugRect.anchorMax = new Vector2(0.98f, 0.27f);
             debugRect.offsetMin = Vector2.zero;
             debugRect.offsetMax = Vector2.zero;
+            debugText.gameObject.SetActive(showDebugPanel);
         }
 
         private void ConfigureEvaluators()
@@ -380,6 +390,23 @@ namespace VikingRiverRowers
             textRect.offsetMax = Vector2.zero;
         }
 
+        private void CreateCleanHud(Transform parent, Font font)
+        {
+            distanceText = CreateText("RhythmDistanceText", parent, font, 24, TextAnchor.MiddleLeft, Color.white);
+            RectTransform distanceRect = distanceText.rectTransform;
+            distanceRect.anchorMin = new Vector2(0.03f, 0.82f);
+            distanceRect.anchorMax = new Vector2(0.36f, 0.865f);
+            distanceRect.offsetMin = Vector2.zero;
+            distanceRect.offsetMax = Vector2.zero;
+
+            phaseText = CreateText("RhythmPhaseText", parent, font, 24, TextAnchor.MiddleRight, new Color(1f, 0.86f, 0.28f, 1f));
+            RectTransform phaseRect = phaseText.rectTransform;
+            phaseRect.anchorMin = new Vector2(0.64f, 0.82f);
+            phaseRect.anchorMax = new Vector2(0.97f, 0.865f);
+            phaseRect.offsetMin = Vector2.zero;
+            phaseRect.offsetMax = Vector2.zero;
+        }
+
         private void UpdateRowMeterVisual()
         {
             if (GameManager.Instance == null || rowMeterFill == null || rowMeterText == null) return;
@@ -393,6 +420,21 @@ namespace VikingRiverRowers
             rowMeterText.text = GameManager.Instance.IsSwipeSurging
                 ? $"SURGE {Mathf.CeilToInt(GameManager.Instance.SwipeSurgeRemaining01 * 100f)}%"
                 : $"ROW METER {Mathf.RoundToInt(GameManager.Instance.RowMeter01 * 100f)}%";
+        }
+
+        private void UpdateCleanHud()
+        {
+            if (GameManager.Instance == null) return;
+
+            if (distanceText != null)
+            {
+                distanceText.text = $"Distance {Mathf.FloorToInt(GameManager.Instance.DistanceTraveled)}m";
+            }
+
+            if (phaseText != null)
+            {
+                phaseText.text = GameManager.Instance.IsSwipeSurging ? "SURGE" : "ROW";
+            }
         }
 
         private PairedStrokeEvaluation EvaluatePair(StrokeEvaluation left, StrokeEvaluation right)
@@ -485,6 +527,8 @@ namespace VikingRiverRowers
             obj.transform.SetParent(parent, false);
             Image image = obj.GetComponent<Image>();
             image.color = new Color(0.18f, 0.2f, 0.22f, 0.94f);
+            Button button = obj.GetComponent<Button>();
+            button.onClick.AddListener(() => AudioManager.Instance?.PlayButtonClick());
 
             Text text = CreateText("Label", obj.transform, font, 22, TextAnchor.MiddleCenter, Color.white);
             text.fontStyle = FontStyle.Bold;
@@ -494,7 +538,7 @@ namespace VikingRiverRowers
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
 
-            return obj.GetComponent<Button>();
+            return button;
         }
     }
 }

@@ -31,6 +31,7 @@ namespace VikingRiverRowers
         [SerializeField] private float rhythmImbalanceRollAngle = 8f;
         [SerializeField] private float rhythmStrokePitchAngle = 4f;
         [SerializeField] private float rhythmPairPitchKickAngle = 5f;
+        [SerializeField] private float rhythmCameraFov = 78f;
 
         [Header("Rapid Phase Pushback")]
         [SerializeField] private float pushbackSpeed = 1.6f; // Speed of drift backward
@@ -54,6 +55,9 @@ namespace VikingRiverRowers
         private float rhythmRightProgress;
         private float rhythmPairPitchKick;
         private float rhythmHitRollKick;
+        private Camera cachedCamera;
+        private float defaultCameraFov;
+        private bool hasDefaultCameraFov;
 
         // Swipe processing variables
         private Vector2 touchStartPos;
@@ -108,6 +112,7 @@ namespace VikingRiverRowers
                 Vector3 menuPos = transform.position;
                 menuPos.y = visualYOffset;
                 menuPos.z = currentZ;
+                UpdateRhythmCameraFraming(state == GameState.RhythmLab);
                 float rhythmTargetX = state == GameState.RhythmLab ? lanePositions[currentLane] : lanePositions[1];
                 menuPos.x = Mathf.SmoothDamp(menuPos.x, rhythmTargetX, ref laneSwitchVelocity, laneSwitchSmoothTime);
                 transform.position = menuPos;
@@ -334,6 +339,24 @@ namespace VikingRiverRowers
             int direction = lane == RowingLane.Left ? -1 : 1;
             currentLane = Mathf.Clamp(currentLane + direction, 0, lanePositions.Length - 1);
             rhythmHitRollKick = -direction * (laneKickAngle * 0.45f);
+        }
+
+        private void UpdateRhythmCameraFraming(bool rhythmActive)
+        {
+            if (cachedCamera == null)
+            {
+                cachedCamera = Camera.main;
+                if (cachedCamera == null) return;
+            }
+
+            if (!hasDefaultCameraFov)
+            {
+                defaultCameraFov = cachedCamera.fieldOfView;
+                hasDefaultCameraFov = true;
+            }
+
+            float targetFov = rhythmActive ? rhythmCameraFov : defaultCameraFov;
+            cachedCamera.fieldOfView = Mathf.Lerp(cachedCamera.fieldOfView, targetFov, 6f * Time.deltaTime);
         }
 
         private void HandleRhythmStrokeProgress(float leftProgress, float rightProgress, bool leftActive, bool rightActive)

@@ -38,6 +38,7 @@ namespace VikingRiverRowers
         [SerializeField] private float missRowMeterPenalty = 0.1f;
         [SerializeField] private float swipeSurgeDuration = 7f;
         [SerializeField] private float swipeSurgeSpeedMultiplier = 1.9f;
+        [SerializeField] private float swipeSurgeDistanceMultiplier = 2f;
         
         [Header("Scoring")]
         [SerializeField] private float distanceScoreMultiplier = 2f; // Distance units per meter of scroll
@@ -47,6 +48,7 @@ namespace VikingRiverRowers
         public float CurrentSpeed { get; private set; }
         public float DistanceTraveled { get; private set; }
         public float HighScore { get; private set; }
+        public float SwipeHighScore { get; private set; }
         public int CurrentLevel { get; private set; } = 1;
         public float TimeUntilRapid => currentState == GameState.Playing ? Mathf.Max(0f, nextRapidTimer) : 0f;
         public float RapidTimeRemaining => currentState == GameState.RapidPhase ? Mathf.Max(0f, rapidPhaseTimer) : 0f;
@@ -56,6 +58,10 @@ namespace VikingRiverRowers
         public float RowMeter01 { get; private set; }
         public bool IsSwipeSurging => currentState == GameState.RhythmLab && swipeSurgeTimer > 0f;
         public float SwipeSurgeRemaining01 => swipeSurgeDuration <= 0f ? 0f : Mathf.Clamp01(swipeSurgeTimer / swipeSurgeDuration);
+        public bool LastRunWasSwipeMode => lastRunWasSwipeMode;
+        public int SwipeObstacleHits { get; private set; }
+        public int SwipeLongestPerfectStreak { get; private set; }
+        public float SwipeAverageRowQuality01 => swipePairedRowCount <= 0 ? 0f : swipeRowQualityTotal / swipePairedRowCount;
 
         // Timers
         private float nextRapidTimer;
@@ -65,6 +71,9 @@ namespace VikingRiverRowers
         private float nextMilestone;
         private int lastAnnouncedLevel = 1;
         private bool lastRunWasSwipeMode;
+        private int swipePairedRowCount;
+        private int swipeCurrentPerfectStreak;
+        private float swipeRowQualityTotal;
 
         // Events
         public static event Action<GameState> OnStateChanged;
@@ -82,6 +91,7 @@ namespace VikingRiverRowers
             DontDestroyOnLoad(gameObject);
 
             HighScore = PlayerPrefs.GetFloat("Viking_HighScore", 0f);
+            SwipeHighScore = PlayerPrefs.GetFloat("Viking_SwipeHighScore", 0f);
             EnsureAudioManager();
             EnsureFeedbackManager();
             EnsureRhythmRowingLab();
@@ -206,7 +216,16 @@ namespace VikingRiverRowers
         {
             if (currentState == GameState.GameOver) return;
 
-            if (DistanceTraveled > HighScore)
+            if (lastRunWasSwipeMode)
+            {
+                if (DistanceTraveled > SwipeHighScore)
+                {
+                    SwipeHighScore = DistanceTraveled;
+                    PlayerPrefs.SetFloat("Viking_SwipeHighScore", SwipeHighScore);
+                    PlayerPrefs.Save();
+                }
+            }
+            else if (DistanceTraveled > HighScore)
             {
                 HighScore = DistanceTraveled;
                 PlayerPrefs.SetFloat("Viking_HighScore", HighScore);
@@ -230,6 +249,7 @@ namespace VikingRiverRowers
         public void StartSwipeMode()
         {
             lastRunWasSwipeMode = true;
+            ResetSwipeRunStats();
             DistanceTraveled = 0f;
             activePlayTime = 0f;
             nextRapidTimer = timeBetweenRapids;
@@ -290,6 +310,18 @@ namespace VikingRiverRowers
         {
             if (currentState != GameState.RhythmLab) return;
 
+            swipePairedRowCount++;
+            swipeRowQualityTotal += Mathf.Clamp01(rowQuality01);
+            if (label == "Perfect")
+            {
+                swipeCurrentPerfectStreak++;
+                SwipeLongestPerfectStreak = Mathf.Max(SwipeLongestPerfectStreak, swipeCurrentPerfectStreak);
+            }
+            else
+            {
+                swipeCurrentPerfectStreak = 0;
+            }
+
             if (label == "Perfect")
             {
                 RowMeter01 += perfectRowMeterGain;
@@ -318,6 +350,9 @@ namespace VikingRiverRowers
         {
             if (currentState != GameState.RhythmLab) return false;
 
+            SwipeObstacleHits++;
+            swipeCurrentPerfectStreak = 0;
+
             if (swipeSurgeTimer > 0f)
             {
                 swipeSurgeTimer = 0f;
@@ -330,12 +365,22 @@ namespace VikingRiverRowers
             return false;
         }
 
+        private void ResetSwipeRunStats()
+        {
+            SwipeObstacleHits = 0;
+            SwipeLongestPerfectStreak = 0;
+            swipePairedRowCount = 0;
+            swipeCurrentPerfectStreak = 0;
+            swipeRowQualityTotal = 0f;
+        }
+
         private void UpdateSwipeModeProgression()
         {
             activePlayTime += Time.deltaTime;
             float dynamicBaseSpeed = Mathf.Min(baseSpeed + (activePlayTime * speedIncreaseRate), maxBaseSpeed);
             CurrentLevel = Mathf.FloorToInt(dynamicBaseSpeed / 5f) + 1;
-            CurrentSpeed = swipeSurgeTimer > 0f ? dynamicBaseSpeed * swipeSurgeSpeedMultiplier : dynamicBaseSpeed;
+            bool isSurging = swipeSurgeTimer > 0f;
+            CurrentSpeed = isSurging ? dynamicBaseSpeed * swipeSurgeSpeedMultiplier : dynamicBaseSpeed;
 
             if (swipeSurgeTimer > 0f)
             {
@@ -348,7 +393,8 @@ namespace VikingRiverRowers
                 }
             }
 
-            DistanceTraveled += CurrentSpeed * distanceScoreMultiplier * Time.deltaTime;
+            float activeDistanceMultiplier = isSurging ? swipeSurgeDistanceMultiplier : 1f;
+            DistanceTraveled += CurrentSpeed * distanceScoreMultiplier * activeDistanceMultiplier * Time.deltaTime;
             CheckMilestones();
             OnScoreUpdated?.Invoke();
         }
