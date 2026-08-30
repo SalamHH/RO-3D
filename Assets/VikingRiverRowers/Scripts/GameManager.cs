@@ -9,7 +9,8 @@ namespace VikingRiverRowers
         Playing,
         RapidPhase,
         RhythmLab,
-        GameOver
+        GameOver,
+        Paused
     }
 
     public class GameManager : MonoBehaviour
@@ -19,6 +20,7 @@ namespace VikingRiverRowers
         [Header("State")]
         [SerializeField] private GameState currentState = GameState.Menu;
         public GameState CurrentState => currentState;
+        public bool IsPaused => currentState == GameState.Paused;
 
         [Header("Speed & Difficulty Settings")]
         [SerializeField] private float baseSpeed = 8f;
@@ -74,6 +76,7 @@ namespace VikingRiverRowers
         private int swipePairedRowCount;
         private int swipeCurrentPerfectStreak;
         private float swipeRowQualityTotal;
+        private GameState stateBeforePause = GameState.Playing;
 
         // Events
         public static event Action<GameState> OnStateChanged;
@@ -89,6 +92,7 @@ namespace VikingRiverRowers
             }
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            Time.timeScale = 1f;
 
             HighScore = PlayerPrefs.GetFloat("Viking_HighScore", 0f);
             SwipeHighScore = PlayerPrefs.GetFloat("Viking_SwipeHighScore", 0f);
@@ -176,6 +180,7 @@ namespace VikingRiverRowers
 
         public void StartGame()
         {
+            Time.timeScale = 1f;
             lastRunWasSwipeMode = false;
             DistanceTraveled = 0f;
             activePlayTime = 0f;
@@ -216,6 +221,8 @@ namespace VikingRiverRowers
         {
             if (currentState == GameState.GameOver) return;
 
+            Time.timeScale = 1f;
+
             if (lastRunWasSwipeMode)
             {
                 if (DistanceTraveled > SwipeHighScore)
@@ -248,6 +255,7 @@ namespace VikingRiverRowers
 
         public void StartSwipeMode()
         {
+            Time.timeScale = 1f;
             lastRunWasSwipeMode = true;
             ResetSwipeRunStats();
             DistanceTraveled = 0f;
@@ -274,6 +282,7 @@ namespace VikingRiverRowers
 
         public void ReturnToMenu()
         {
+            Time.timeScale = 1f;
             lastRunWasSwipeMode = false;
             DistanceTraveled = 0f;
             activePlayTime = 0f;
@@ -290,6 +299,44 @@ namespace VikingRiverRowers
             }
 
             SetState(GameState.Menu);
+        }
+
+        public void PauseGame()
+        {
+            if (!IsRunningState(currentState)) return;
+
+            stateBeforePause = currentState;
+            SetState(GameState.Paused);
+            Time.timeScale = 0f;
+        }
+
+        public void ResumeGame()
+        {
+            if (currentState != GameState.Paused) return;
+
+            Time.timeScale = 1f;
+            SetState(IsRunningState(stateBeforePause) ? stateBeforePause : GameState.Playing);
+        }
+
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            if (pauseStatus)
+            {
+                PauseGame();
+            }
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            if (!hasFocus)
+            {
+                PauseGame();
+            }
+        }
+
+        private static bool IsRunningState(GameState state)
+        {
+            return state == GameState.Playing || state == GameState.RapidPhase || state == GameState.RhythmLab;
         }
 
         private void EnsureRhythmRowingLab()

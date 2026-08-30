@@ -4,7 +4,12 @@ namespace VikingRiverRowers
 {
     public class FeedbackManager : MonoBehaviour
     {
+        private const string HapticsPreference = "Viking_HapticsEnabled";
+        private const string ReducedMotionPreference = "Viking_ReducedMotion";
+
         public static FeedbackManager Instance { get; private set; }
+        public bool HapticsEnabled => enableMobileHaptics;
+        public bool ReducedMotion => reducedMotion;
 
         [Header("Camera Shake")]
         [SerializeField] private float rapidShakeDuration = 0.35f;
@@ -26,6 +31,7 @@ namespace VikingRiverRowers
         [SerializeField] private int rhythmMinSplashParticles = 8;
         [SerializeField] private int rhythmMaxSplashParticles = 30;
         [SerializeField] private bool enableMobileHaptics = true;
+        [SerializeField] private bool reducedMotion;
 
         private Camera targetCamera;
         private Vector3 cameraStartLocalPosition;
@@ -52,6 +58,8 @@ namespace VikingRiverRowers
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            enableMobileHaptics = PlayerPrefs.GetInt(HapticsPreference, enableMobileHaptics ? 1 : 0) == 1;
+            reducedMotion = PlayerPrefs.GetInt(ReducedMotionPreference, reducedMotion ? 1 : 0) == 1;
             CreateEffects();
         }
 
@@ -140,7 +148,8 @@ namespace VikingRiverRowers
         {
             if (rapidStreaks == null) return;
 
-            bool rapidActive = currentState == GameState.RapidPhase || (GameManager.Instance != null && GameManager.Instance.IsSwipeSurging);
+            bool rapidActive = !reducedMotion &&
+                (currentState == GameState.RapidPhase || (GameManager.Instance != null && GameManager.Instance.IsSwipeSurging));
             if (streakContainer.gameObject.activeSelf != rapidActive)
             {
                 SetRapidStreaksActive(rapidActive);
@@ -172,13 +181,17 @@ namespace VikingRiverRowers
 
         private void HandleStateChanged(GameState newState)
         {
+            GameState previousState = currentState;
             currentState = newState;
 
             if (newState == GameState.RapidPhase)
             {
-                Shake(rapidShakeDuration, rapidShakeStrength);
-                ResetRapidStreaks();
-                SetRapidStreaksActive(true);
+                if (previousState != GameState.Paused)
+                {
+                    Shake(rapidShakeDuration, rapidShakeStrength);
+                    ResetRapidStreaks();
+                }
+                SetRapidStreaksActive(!reducedMotion);
             }
             else if (newState == GameState.GameOver)
             {
@@ -246,6 +259,8 @@ namespace VikingRiverRowers
 
         private void Shake(float duration, float strength)
         {
+            if (reducedMotion) return;
+
             if (targetCamera == null)
             {
                 CacheCamera();
@@ -254,6 +269,32 @@ namespace VikingRiverRowers
             shakeDuration = Mathf.Max(duration, 0.01f);
             shakeTimer = Mathf.Max(shakeTimer, duration);
             shakeStrength = Mathf.Max(shakeStrength, strength);
+        }
+
+        public void SetHapticsEnabled(bool enabled)
+        {
+            enableMobileHaptics = enabled;
+            PlayerPrefs.SetInt(HapticsPreference, enabled ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+
+        public void SetReducedMotion(bool enabled)
+        {
+            reducedMotion = enabled;
+            PlayerPrefs.SetInt(ReducedMotionPreference, enabled ? 1 : 0);
+            PlayerPrefs.Save();
+
+            if (enabled)
+            {
+                shakeTimer = 0f;
+                shakeStrength = 0f;
+                if (targetCamera != null)
+                {
+                    targetCamera.transform.localPosition = GetCameraBaseLocalPosition();
+                    targetCamera.transform.localRotation = cameraStartLocalRotation;
+                }
+                SetRapidStreaksActive(false);
+            }
         }
 
         private void PlayParticleBurst(ParticleSystem effect, Vector3 position, int count)

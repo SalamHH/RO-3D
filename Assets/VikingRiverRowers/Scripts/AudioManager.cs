@@ -6,7 +6,12 @@ namespace VikingRiverRowers
 {
     public class AudioManager : MonoBehaviour
     {
+        private const string MasterVolumePreference = "Viking_MasterVolume";
+        private const string ChantPreference = "Viking_ChantEnabled";
+
         public static AudioManager Instance { get; private set; }
+        public float MasterVolume => masterVolume;
+        public bool ChantEnabled => enableRapidChant;
 
         [Header("Mix")]
         [SerializeField, Range(0f, 1f)] private float masterVolume = 0.85f;
@@ -69,6 +74,9 @@ namespace VikingRiverRowers
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+
+            masterVolume = PlayerPrefs.GetFloat(MasterVolumePreference, masterVolume);
+            enableRapidChant = PlayerPrefs.GetInt(ChantPreference, enableRapidChant ? 1 : 0) == 1;
 
             sfxSource = CreateSource("SFXSource");
             rhythmSource = CreateSource("RhythmSource");
@@ -326,6 +334,35 @@ namespace VikingRiverRowers
             if (!enableButtonClickSound) return;
 
             PlayOneShot(sfxSource, buttonClickClip, sfxVolume * 0.85f, Random.Range(0.96f, 1.04f));
+        }
+
+        public void SetMasterVolume(float value)
+        {
+            masterVolume = Mathf.Clamp01(value);
+            PlayerPrefs.SetFloat(MasterVolumePreference, masterVolume);
+            PlayerPrefs.Save();
+
+            if (surgeSource != null && surgeSource.loop)
+            {
+                surgeSource.volume = rapidChantVolume * masterVolume;
+            }
+        }
+
+        public void SetChantEnabled(bool enabled)
+        {
+            enableRapidChant = enabled;
+            PlayerPrefs.SetInt(ChantPreference, enabled ? 1 : 0);
+            PlayerPrefs.Save();
+
+            if (!enabled)
+            {
+                StopRapidChant();
+            }
+            else if (currentState == GameState.RapidPhase ||
+                     (currentState == GameState.RhythmLab && GameManager.Instance != null && GameManager.Instance.IsSwipeSurging))
+            {
+                PlayRapidChant();
+            }
         }
 
         private void PlayOneShot(AudioSource source, AudioClip clip, float volume, float pitch)

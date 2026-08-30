@@ -102,6 +102,8 @@ namespace VikingRiverRowers
             if (GameManager.Instance == null) return;
 
             GameState state = GameManager.Instance.CurrentState;
+            if (state == GameState.Paused) return;
+
             if (state == GameState.GameOver || state == GameState.Menu || state == GameState.RhythmLab)
             {
                 // Reset positions in Menu/GameOver
