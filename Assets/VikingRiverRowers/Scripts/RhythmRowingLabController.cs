@@ -327,14 +327,6 @@ namespace VikingRiverRowers
             judgmentRect.offsetMin = Vector2.zero;
             judgmentRect.offsetMax = Vector2.zero;
 
-            Button homeButton = CreateButton("RhythmHomeButton", canvasObject.transform, font, "HOME");
-            RectTransform homeRect = homeButton.GetComponent<RectTransform>();
-            homeRect.anchorMin = new Vector2(0.03f, 0.91f);
-            homeRect.anchorMax = new Vector2(0.21f, 0.97f);
-            homeRect.offsetMin = Vector2.zero;
-            homeRect.offsetMax = Vector2.zero;
-            homeButton.onClick.AddListener(() => GameManager.Instance.ReturnToMenu());
-
             CreateRowMeter(canvasObject.transform, font);
             CreateCleanHud(canvasObject.transform, font);
 

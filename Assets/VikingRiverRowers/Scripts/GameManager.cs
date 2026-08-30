@@ -58,6 +58,9 @@ namespace VikingRiverRowers
         public bool IsRapidIncoming => currentState == GameState.Playing && nextRapidTimer <= rapidWarningLeadTime;
         public string CurrentLevelName => GetLevelName(CurrentLevel);
         public float RowMeter01 { get; private set; }
+        public float PerfectRowMeterGain01 => perfectRowMeterGain;
+        public float GoodRowMeterGain01 => goodRowMeterGain;
+        public float MissRowMeterPenalty01 => missRowMeterPenalty;
         public bool IsSwipeSurging => currentState == GameState.RhythmLab && swipeSurgeTimer > 0f;
         public float SwipeSurgeRemaining01 => swipeSurgeDuration <= 0f ? 0f : Mathf.Clamp01(swipeSurgeTimer / swipeSurgeDuration);
         public bool LastRunWasSwipeMode => lastRunWasSwipeMode;

@@ -19,6 +19,10 @@ namespace VikingRiverRowers
         [SerializeField] private float rhythmCameraSideOffset = 1.45f;
         [SerializeField] private float rhythmCameraOffsetSmoothTime = 0.16f;
 
+        [Header("Surge Lens")]
+        [SerializeField] private float surgeFieldOfViewBoost = 8f;
+        [SerializeField] private float surgeFieldOfViewSmoothTime = 0.18f;
+
         [Header("Water Motion")]
         [SerializeField] private int rapidStreakCount = 20;
         [SerializeField] private float rapidStreakSpeed = 30f;
@@ -41,6 +45,8 @@ namespace VikingRiverRowers
         private float shakeStrength;
         private float rhythmCameraOffsetX;
         private float rhythmCameraOffsetVelocity;
+        private float cameraStartFieldOfView;
+        private float fieldOfViewVelocity;
 
         private ParticleSystem boostSplash;
         private ParticleSystem crashBurst;
@@ -95,6 +101,7 @@ namespace VikingRiverRowers
             }
 
             UpdateCameraShake();
+            UpdateSurgeLens();
             UpdateRapidStreaks();
         }
 
@@ -105,6 +112,27 @@ namespace VikingRiverRowers
 
             cameraStartLocalPosition = targetCamera.transform.localPosition;
             cameraStartLocalRotation = targetCamera.transform.localRotation;
+            cameraStartFieldOfView = targetCamera.fieldOfView;
+        }
+
+        private void UpdateSurgeLens()
+        {
+            if (targetCamera == null || targetCamera.orthographic) return;
+
+            bool surgeActive = currentState == GameState.RapidPhase ||
+                (GameManager.Instance != null && GameManager.Instance.IsSwipeSurging);
+            float targetFieldOfView = cameraStartFieldOfView;
+            if (surgeActive && !reducedMotion)
+            {
+                targetFieldOfView += surgeFieldOfViewBoost;
+            }
+
+            targetCamera.fieldOfView = Mathf.SmoothDamp(
+                targetCamera.fieldOfView,
+                targetFieldOfView,
+                ref fieldOfViewVelocity,
+                Mathf.Max(0.01f, surgeFieldOfViewSmoothTime)
+            );
         }
 
         private void UpdateCameraShake()
@@ -292,6 +320,11 @@ namespace VikingRiverRowers
                 {
                     targetCamera.transform.localPosition = GetCameraBaseLocalPosition();
                     targetCamera.transform.localRotation = cameraStartLocalRotation;
+                    if (!targetCamera.orthographic)
+                    {
+                        targetCamera.fieldOfView = cameraStartFieldOfView;
+                        fieldOfViewVelocity = 0f;
+                    }
                 }
                 SetRapidStreaksActive(false);
             }
@@ -340,8 +373,11 @@ namespace VikingRiverRowers
             var velocity = particles.velocityOverLifetime;
             velocity.enabled = true;
             velocity.space = ParticleSystemSimulationSpace.Local;
-            velocity.y = new ParticleSystem.MinMaxCurve(0.6f, 1.8f);
-            velocity.z = new ParticleSystem.MinMaxCurve(-1.4f, -0.4f);
+            // Unity requires every axis to use the same curve mode. Keep all three
+            // axes in Constant mode so assigning them never creates a mixed state.
+            velocity.x = new ParticleSystem.MinMaxCurve(0f);
+            velocity.y = new ParticleSystem.MinMaxCurve(1.2f);
+            velocity.z = new ParticleSystem.MinMaxCurve(-0.9f);
 
             var colorOverLifetime = particles.colorOverLifetime;
             colorOverLifetime.enabled = true;

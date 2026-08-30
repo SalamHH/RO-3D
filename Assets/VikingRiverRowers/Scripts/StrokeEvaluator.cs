@@ -120,7 +120,7 @@ namespace VikingRiverRowers
             bool movedForwardEnough = accumulatedBackwardMotion <= maxBackwardMotion;
             bool durationOk = strokeDurationSeconds >= minimumStrokeDurationSeconds;
             float allowedPathDeviation = GetAllowedPathDeviation();
-            bool valid = startedInZone && endedInZone && stayedOnPath;
+            bool valid = startedInZone && completedEnough && endedInZone && stayedOnPath && movedForwardEnough && durationOk;
             float pathAccuracy = Mathf.Clamp01(1f - (maxDeviation / Mathf.Max(0.0001f, allowedPathDeviation)));
             float completionQuality = Mathf.Clamp01(Mathf.Min(maxProgress, finalProgress));
             float forwardQuality = Mathf.Clamp01(1f - (accumulatedBackwardMotion / Mathf.Max(0.0001f, maxBackwardMotion)));

@@ -13,6 +13,10 @@ namespace VikingRiverRowers
         [SerializeField] private float startZOffset = -60f; // Starts well behind the camera so no trailing edge is visible.
         [SerializeField] private float waterTextureFlowMultiplier = 0.035f;
 
+        [Header("Surge Scenery Response")]
+        [SerializeField] private float surgeScenerySpeedMultiplier = 1.45f;
+        [SerializeField] private float surgeResponseSpeed = 3f;
+
         [Header("Materials")]
         [SerializeField] private Material waterMaterial;
         [SerializeField] private Material bankMaterial;
@@ -33,6 +37,7 @@ namespace VikingRiverRowers
         private GameObject[] segments;
         private float totalLength;
         private Vector2 waterTextureOffset;
+        private float scenerySpeedMultiplier = 1f;
 
         private void Awake()
         {
@@ -387,7 +392,17 @@ namespace VikingRiverRowers
             if (GameManager.Instance == null) return;
             if (segments == null) return;
 
-            float scrollSpeed = GameManager.Instance.CurrentSpeed;
+            bool surgeActive = GameManager.Instance.CurrentState == GameState.RapidPhase || GameManager.Instance.IsSwipeSurging;
+            float targetMultiplier = surgeActive ? Mathf.Max(1f, surgeScenerySpeedMultiplier) : 1f;
+            scenerySpeedMultiplier = Mathf.MoveTowards(
+                scenerySpeedMultiplier,
+                targetMultiplier,
+                Mathf.Max(0.01f, surgeResponseSpeed) * Time.deltaTime
+            );
+
+            // Scenery gets extra surge-only parallax. Obstacles continue to use CurrentSpeed,
+            // preserving collision timing while trees and riverbanks sell the acceleration.
+            float scrollSpeed = GameManager.Instance.CurrentSpeed * scenerySpeedMultiplier;
             AnimateWaterSurface(scrollSpeed);
             if (scrollSpeed <= 0f) return;
 

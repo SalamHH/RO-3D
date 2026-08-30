@@ -42,6 +42,7 @@ namespace VikingRiverRowers
         private Toggle chantToggle;
         private Toggle hapticsToggle;
         private Toggle reducedMotionToggle;
+        private RectTransform safeAreaRoot;
         private bool settingsOpenedFromPause;
 
         private const float GameOverPanelDelay = 1f;
@@ -98,6 +99,10 @@ namespace VikingRiverRowers
             canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             canvasScaler.referenceResolution = new Vector2(1920f, 1080f);
             canvasScaler.matchWidthOrHeight = 0.5f;
+
+            GameObject safeAreaObj = new GameObject("SafeArea", typeof(RectTransform), typeof(SafeAreaFitter));
+            safeAreaObj.transform.SetParent(canvas.transform, false);
+            safeAreaRoot = safeAreaObj.GetComponent<RectTransform>();
 
             // Add EventSystem if missing
             if (UnityEngine.Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
@@ -172,7 +177,7 @@ namespace VikingRiverRowers
             levelRect.anchorMin = new Vector2(1f, 1f);
             levelRect.anchorMax = new Vector2(1f, 1f);
             levelRect.pivot = new Vector2(1f, 1f);
-            levelRect.anchoredPosition = new Vector2(-30f, -30f);
+            levelRect.anchoredPosition = new Vector2(-140f, -30f);
             levelText.alignment = TextAnchor.MiddleRight;
 
             // Rapid Warning Banner
@@ -229,14 +234,14 @@ namespace VikingRiverRowers
             dangerLabelRect.anchoredPosition = Vector2.zero;
             rapidDangerPanel.SetActive(false);
 
-            GameObject pauseButtonObj = CreateButton("PauseButton", canvas.transform, "II", defaultFont, Vector2.zero);
+            GameObject pauseButtonObj = CreateButton("PauseButton", safeAreaRoot, "II", defaultFont, Vector2.zero);
             pauseButton = pauseButtonObj.GetComponent<Button>();
             RectTransform pauseButtonRect = pauseButtonObj.GetComponent<RectTransform>();
-            pauseButtonRect.anchorMin = new Vector2(0.5f, 1f);
-            pauseButtonRect.anchorMax = new Vector2(0.5f, 1f);
-            pauseButtonRect.pivot = new Vector2(0.5f, 1f);
+            pauseButtonRect.anchorMin = new Vector2(1f, 1f);
+            pauseButtonRect.anchorMax = new Vector2(1f, 1f);
+            pauseButtonRect.pivot = new Vector2(1f, 1f);
             pauseButtonRect.sizeDelta = new Vector2(86f, 64f);
-            pauseButtonRect.anchoredPosition = new Vector2(0f, -22f);
+            pauseButtonRect.anchoredPosition = new Vector2(-24f, -24f);
             pauseButton.onClick.AddListener(() => GameManager.Instance?.PauseGame());
 
             // 4. Create Game Over Panel
@@ -289,6 +294,7 @@ namespace VikingRiverRowers
 
             CreatePauseMenu(defaultFont);
             CreateSettingsMenu(defaultFont);
+            safeAreaRoot.SetAsLastSibling();
         }
 
         private void CreatePauseMenu(Font font)
@@ -934,6 +940,56 @@ namespace VikingRiverRowers
             {
                 menuStatusText.text = "SWIPE MODE - COMING SOON";
             }
+        }
+    }
+
+    /// <summary>Keeps child controls clear of notches, rounded corners, and the home indicator.</summary>
+    public class SafeAreaFitter : MonoBehaviour
+    {
+        private RectTransform rectTransform;
+        private Rect lastSafeArea = new Rect(-1f, -1f, -1f, -1f);
+        private int lastScreenWidth = -1;
+        private int lastScreenHeight = -1;
+
+        private void Awake()
+        {
+            rectTransform = GetComponent<RectTransform>();
+        }
+
+        private void OnEnable()
+        {
+            ApplySafeArea();
+        }
+
+        private void Update()
+        {
+            if (lastSafeArea != Screen.safeArea || lastScreenWidth != Screen.width || lastScreenHeight != Screen.height)
+            {
+                ApplySafeArea();
+            }
+        }
+
+        private void ApplySafeArea()
+        {
+            if (rectTransform == null) rectTransform = GetComponent<RectTransform>();
+            if (rectTransform == null || Screen.width <= 0 || Screen.height <= 0) return;
+
+            Rect safeArea = Screen.safeArea;
+            Vector2 anchorMin = safeArea.position;
+            Vector2 anchorMax = safeArea.position + safeArea.size;
+            anchorMin.x /= Screen.width;
+            anchorMin.y /= Screen.height;
+            anchorMax.x /= Screen.width;
+            anchorMax.y /= Screen.height;
+
+            rectTransform.anchorMin = anchorMin;
+            rectTransform.anchorMax = anchorMax;
+            rectTransform.offsetMin = Vector2.zero;
+            rectTransform.offsetMax = Vector2.zero;
+
+            lastSafeArea = safeArea;
+            lastScreenWidth = Screen.width;
+            lastScreenHeight = Screen.height;
         }
     }
 }
