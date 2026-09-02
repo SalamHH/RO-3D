@@ -12,7 +12,7 @@ namespace VikingRiverRowers
 
             // Only move if game is in a running state
             GameState state = GameManager.Instance.CurrentState;
-            if (state == GameState.Playing || state == GameState.RapidPhase)
+            if (state == GameState.Playing || state == GameState.RapidPhase || state == GameState.RhythmLab)
             {
                 // Move in -Z direction based on river scrolling speed
                 transform.Translate(0f, 0f, -GameManager.Instance.CurrentSpeed * Time.deltaTime, Space.World);

@@ -6,7 +6,12 @@ namespace VikingRiverRowers
 {
     public class AudioManager : MonoBehaviour
     {
+        private const string MasterVolumePreference = "Viking_MasterVolume";
+        private const string ChantPreference = "Viking_ChantEnabled";
+
         public static AudioManager Instance { get; private set; }
+        public float MasterVolume => masterVolume;
+        public bool ChantEnabled => enableRapidChant;
 
         [Header("Mix")]
         [SerializeField, Range(0f, 1f)] private float masterVolume = 0.85f;
@@ -21,13 +26,17 @@ namespace VikingRiverRowers
         [SerializeField] private bool enableRapidDrums = false;
         [SerializeField] private bool enableRapidChant = true;
         [SerializeField] private bool enableBoostSound = false;
+        [SerializeField] private bool enableRhythmStrokeSound = true;
         [SerializeField] private bool enableRapidHorn = false;
         [SerializeField] private bool enableCrashSound = false;
         [SerializeField] private bool enableStartSound = false;
+        [SerializeField] private bool enableButtonClickSound = true;
 
         [Header("Audio Assets")]
         [SerializeField] private AudioClip rapidChantClip;
         [SerializeField] private string rapidChantAssetPath = "Audio/RO chant.wav";
+        [SerializeField] private AudioClip buttonClickClip;
+        [SerializeField] private string buttonClickResourcePath = "Audio/water splash button";
 
         [Header("Rhythm")]
         [SerializeField] private float normalRowInterval = 0.48f;
@@ -52,6 +61,7 @@ namespace VikingRiverRowers
         private float rowTimer;
         private float rapidDrumTimer;
         private GameState currentState = GameState.Menu;
+        private bool wasSwipeSurging;
         private readonly System.Random noiseRandom = new System.Random(7219);
 
         private void Awake()
@@ -65,11 +75,15 @@ namespace VikingRiverRowers
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
+            masterVolume = PlayerPrefs.GetFloat(MasterVolumePreference, masterVolume);
+            enableRapidChant = PlayerPrefs.GetInt(ChantPreference, enableRapidChant ? 1 : 0) == 1;
+
             sfxSource = CreateSource("SFXSource");
             rhythmSource = CreateSource("RhythmSource");
             surgeSource = CreateSource("SurgeSource");
 
             BuildClips();
+            LoadAudioAssets();
         }
 
         private void OnEnable()
@@ -77,6 +91,7 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged += HandleStateChanged;
             PlayerController.OnBoosted += PlayBoostSplash;
             PlayerController.OnLaneChanged += PlayLaneWhoosh;
+            RhythmRowingLabController.OnHandStrokeReleased += PlayRhythmStrokeSplash;
         }
 
         private void OnDisable()
@@ -84,10 +99,13 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged -= HandleStateChanged;
             PlayerController.OnBoosted -= PlayBoostSplash;
             PlayerController.OnLaneChanged -= PlayLaneWhoosh;
+            RhythmRowingLabController.OnHandStrokeReleased -= PlayRhythmStrokeSplash;
         }
 
         private void Update()
         {
+            UpdateSwipeSurgeAudio();
+
             if (currentState != GameState.Playing && currentState != GameState.RapidPhase) return;
             if (!enableRowingSound && !enableRapidDrums) return;
 
@@ -157,6 +175,23 @@ namespace VikingRiverRowers
                 }
             }
             else
+            {
+                StopRapidChant();
+                wasSwipeSurging = false;
+            }
+        }
+
+        private void UpdateSwipeSurgeAudio()
+        {
+            bool isSwipeSurging = currentState == GameState.RhythmLab && GameManager.Instance != null && GameManager.Instance.IsSwipeSurging;
+            if (isSwipeSurging == wasSwipeSurging) return;
+
+            wasSwipeSurging = isSwipeSurging;
+            if (isSwipeSurging)
+            {
+                PlayRapidChant();
+            }
+            else if (currentState == GameState.RhythmLab)
             {
                 StopRapidChant();
             }
@@ -274,12 +309,60 @@ namespace VikingRiverRowers
             PlayOneShot(sfxSource, boostSplashClip, sfxVolume, Random.Range(0.96f, 1.08f));
         }
 
+        private void PlayRhythmStrokeSplash(RowingLane lane, float quality01, bool valid)
+        {
+            if (currentState != GameState.RhythmLab) return;
+            if (!enableRhythmStrokeSound) return;
+
+            float quality = valid ? Mathf.Clamp01(quality01) : 0.22f;
+            float lanePitch = lane == RowingLane.Left ? -0.03f : 0.03f;
+            float pitch = Mathf.Lerp(0.88f, 1.16f, quality) + lanePitch;
+            float volume = sfxVolume * Mathf.Lerp(0.35f, 0.95f, quality);
+            PlayOneShot(sfxSource, boostSplashClip, volume, pitch);
+        }
+
         private void PlayLaneWhoosh()
         {
             if (currentState != GameState.Playing && currentState != GameState.RapidPhase) return;
             if (!enableLaneSwitchSound) return;
 
             PlayOneShot(sfxSource, laneWhooshClip, sfxVolume * 0.65f, Random.Range(0.95f, 1.08f));
+        }
+
+        public void PlayButtonClick()
+        {
+            if (!enableButtonClickSound) return;
+
+            PlayOneShot(sfxSource, buttonClickClip, sfxVolume * 0.85f, Random.Range(0.96f, 1.04f));
+        }
+
+        public void SetMasterVolume(float value)
+        {
+            masterVolume = Mathf.Clamp01(value);
+            PlayerPrefs.SetFloat(MasterVolumePreference, masterVolume);
+            PlayerPrefs.Save();
+
+            if (surgeSource != null && surgeSource.loop)
+            {
+                surgeSource.volume = rapidChantVolume * masterVolume;
+            }
+        }
+
+        public void SetChantEnabled(bool enabled)
+        {
+            enableRapidChant = enabled;
+            PlayerPrefs.SetInt(ChantPreference, enabled ? 1 : 0);
+            PlayerPrefs.Save();
+
+            if (!enabled)
+            {
+                StopRapidChant();
+            }
+            else if (currentState == GameState.RapidPhase ||
+                     (currentState == GameState.RhythmLab && GameManager.Instance != null && GameManager.Instance.IsSwipeSurging))
+            {
+                PlayRapidChant();
+            }
         }
 
         private void PlayOneShot(AudioSource source, AudioClip clip, float volume, float pitch)
@@ -348,6 +431,14 @@ namespace VikingRiverRowers
                 float overtone = Mathf.Sin(2f * Mathf.PI * 880f * time) * 0.45f;
                 return (tone + overtone) * envelope * 0.25f;
             });
+        }
+
+        private void LoadAudioAssets()
+        {
+            if (buttonClickClip == null && !string.IsNullOrWhiteSpace(buttonClickResourcePath))
+            {
+                buttonClickClip = Resources.Load<AudioClip>(buttonClickResourcePath);
+            }
         }
 
         private AudioClip CreateClip(string clipName, float duration, System.Func<float, float, float> sampleGenerator)

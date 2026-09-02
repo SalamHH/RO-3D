@@ -4,13 +4,24 @@ namespace VikingRiverRowers
 {
     public class FeedbackManager : MonoBehaviour
     {
+        private const string HapticsPreference = "Viking_HapticsEnabled";
+        private const string ReducedMotionPreference = "Viking_ReducedMotion";
+
         public static FeedbackManager Instance { get; private set; }
+        public bool HapticsEnabled => enableMobileHaptics;
+        public bool ReducedMotion => reducedMotion;
 
         [Header("Camera Shake")]
         [SerializeField] private float rapidShakeDuration = 0.35f;
         [SerializeField] private float rapidShakeStrength = 0.12f;
         [SerializeField] private float crashShakeDuration = 0.55f;
         [SerializeField] private float crashShakeStrength = 0.22f;
+        [SerializeField] private float rhythmCameraSideOffset = 1.45f;
+        [SerializeField] private float rhythmCameraOffsetSmoothTime = 0.16f;
+
+        [Header("Surge Lens")]
+        [SerializeField] private float surgeFieldOfViewBoost = 8f;
+        [SerializeField] private float surgeFieldOfViewSmoothTime = 0.18f;
 
         [Header("Water Motion")]
         [SerializeField] private int rapidStreakCount = 20;
@@ -18,12 +29,24 @@ namespace VikingRiverRowers
         [SerializeField] private float streakMinZ = -16f;
         [SerializeField] private float streakMaxZ = 46f;
 
+        [Header("Swipe Mode Feedback")]
+        [SerializeField] private float rhythmSplashSideOffset = 0.95f;
+        [SerializeField] private float rhythmSplashBackOffset = 0.55f;
+        [SerializeField] private int rhythmMinSplashParticles = 8;
+        [SerializeField] private int rhythmMaxSplashParticles = 30;
+        [SerializeField] private bool enableMobileHaptics = true;
+        [SerializeField] private bool reducedMotion;
+
         private Camera targetCamera;
         private Vector3 cameraStartLocalPosition;
         private Quaternion cameraStartLocalRotation;
         private float shakeTimer;
         private float shakeDuration;
         private float shakeStrength;
+        private float rhythmCameraOffsetX;
+        private float rhythmCameraOffsetVelocity;
+        private float cameraStartFieldOfView;
+        private float fieldOfViewVelocity;
 
         private ParticleSystem boostSplash;
         private ParticleSystem crashBurst;
@@ -41,6 +64,8 @@ namespace VikingRiverRowers
 
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            enableMobileHaptics = PlayerPrefs.GetInt(HapticsPreference, enableMobileHaptics ? 1 : 0) == 1;
+            reducedMotion = PlayerPrefs.GetInt(ReducedMotionPreference, reducedMotion ? 1 : 0) == 1;
             CreateEffects();
         }
 
@@ -55,6 +80,8 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged += HandleStateChanged;
             PlayerController.OnBoosted += HandleBoosted;
             PlayerController.OnLaneChanged += HandleLaneChanged;
+            RhythmRowingLabController.OnHandStrokeReleased += HandleRhythmHandStrokeReleased;
+            RhythmRowingLabController.OnPairedStrokeEvaluated += HandleRhythmPairedStrokeEvaluated;
         }
 
         private void OnDisable()
@@ -62,6 +89,8 @@ namespace VikingRiverRowers
             GameManager.OnStateChanged -= HandleStateChanged;
             PlayerController.OnBoosted -= HandleBoosted;
             PlayerController.OnLaneChanged -= HandleLaneChanged;
+            RhythmRowingLabController.OnHandStrokeReleased -= HandleRhythmHandStrokeReleased;
+            RhythmRowingLabController.OnPairedStrokeEvaluated -= HandleRhythmPairedStrokeEvaluated;
         }
 
         private void LateUpdate()
@@ -72,6 +101,7 @@ namespace VikingRiverRowers
             }
 
             UpdateCameraShake();
+            UpdateSurgeLens();
             UpdateRapidStreaks();
         }
 
@@ -82,6 +112,27 @@ namespace VikingRiverRowers
 
             cameraStartLocalPosition = targetCamera.transform.localPosition;
             cameraStartLocalRotation = targetCamera.transform.localRotation;
+            cameraStartFieldOfView = targetCamera.fieldOfView;
+        }
+
+        private void UpdateSurgeLens()
+        {
+            if (targetCamera == null || targetCamera.orthographic) return;
+
+            bool surgeActive = currentState == GameState.RapidPhase ||
+                (GameManager.Instance != null && GameManager.Instance.IsSwipeSurging);
+            float targetFieldOfView = cameraStartFieldOfView;
+            if (surgeActive && !reducedMotion)
+            {
+                targetFieldOfView += surgeFieldOfViewBoost;
+            }
+
+            targetCamera.fieldOfView = Mathf.SmoothDamp(
+                targetCamera.fieldOfView,
+                targetFieldOfView,
+                ref fieldOfViewVelocity,
+                Mathf.Max(0.01f, surgeFieldOfViewSmoothTime)
+            );
         }
 
         private void UpdateCameraShake()
@@ -90,7 +141,7 @@ namespace VikingRiverRowers
 
             if (shakeTimer <= 0f)
             {
-                targetCamera.transform.localPosition = cameraStartLocalPosition;
+                targetCamera.transform.localPosition = GetCameraBaseLocalPosition();
                 targetCamera.transform.localRotation = cameraStartLocalRotation;
                 shakeStrength = 0f;
                 return;
@@ -101,7 +152,7 @@ namespace VikingRiverRowers
             Vector3 offset = Random.insideUnitSphere * (shakeStrength * falloff);
             offset.z *= 0.2f;
 
-            targetCamera.transform.localPosition = cameraStartLocalPosition + offset;
+            targetCamera.transform.localPosition = GetCameraBaseLocalPosition() + offset;
             targetCamera.transform.localRotation = cameraStartLocalRotation * Quaternion.Euler(
                 Random.Range(-0.6f, 0.6f) * shakeStrength * 10f * falloff,
                 0f,
@@ -109,11 +160,24 @@ namespace VikingRiverRowers
             );
         }
 
+        private Vector3 GetCameraBaseLocalPosition()
+        {
+            float targetOffsetX = 0f;
+            if (currentState == GameState.RhythmLab && PlayerController.Instance != null)
+            {
+                targetOffsetX = (PlayerController.Instance.CurrentLaneIndex - 1) * rhythmCameraSideOffset;
+            }
+
+            rhythmCameraOffsetX = Mathf.SmoothDamp(rhythmCameraOffsetX, targetOffsetX, ref rhythmCameraOffsetVelocity, rhythmCameraOffsetSmoothTime);
+            return cameraStartLocalPosition + Vector3.right * rhythmCameraOffsetX;
+        }
+
         private void UpdateRapidStreaks()
         {
             if (rapidStreaks == null) return;
 
-            bool rapidActive = currentState == GameState.RapidPhase;
+            bool rapidActive = !reducedMotion &&
+                (currentState == GameState.RapidPhase || (GameManager.Instance != null && GameManager.Instance.IsSwipeSurging));
             if (streakContainer.gameObject.activeSelf != rapidActive)
             {
                 SetRapidStreaksActive(rapidActive);
@@ -145,13 +209,17 @@ namespace VikingRiverRowers
 
         private void HandleStateChanged(GameState newState)
         {
+            GameState previousState = currentState;
             currentState = newState;
 
             if (newState == GameState.RapidPhase)
             {
-                Shake(rapidShakeDuration, rapidShakeStrength);
-                ResetRapidStreaks();
-                SetRapidStreaksActive(true);
+                if (previousState != GameState.Paused)
+                {
+                    Shake(rapidShakeDuration, rapidShakeStrength);
+                    ResetRapidStreaks();
+                }
+                SetRapidStreaksActive(!reducedMotion);
             }
             else if (newState == GameState.GameOver)
             {
@@ -176,6 +244,33 @@ namespace VikingRiverRowers
         {
         }
 
+        private void HandleRhythmHandStrokeReleased(RowingLane lane, float quality01, bool valid)
+        {
+            if (currentState != GameState.RhythmLab) return;
+
+            float quality = valid ? Mathf.Clamp01(quality01) : 0.18f;
+            int particleCount = Mathf.RoundToInt(Mathf.Lerp(rhythmMinSplashParticles, rhythmMaxSplashParticles, quality));
+            float side = lane == RowingLane.Left ? -rhythmSplashSideOffset : rhythmSplashSideOffset;
+            Vector3 position = GetPlayerEffectPosition() + new Vector3(side, -0.08f, -rhythmSplashBackOffset);
+            PlayParticleBurst(boostSplash, position, particleCount);
+        }
+
+        private void HandleRhythmPairedStrokeEvaluated(float rowQuality01, string label)
+        {
+            if (currentState != GameState.RhythmLab) return;
+
+            float quality = Mathf.Clamp01(rowQuality01);
+            if (quality >= 0.68f)
+            {
+                Shake(Mathf.Lerp(0.08f, 0.18f, quality), Mathf.Lerp(0.02f, 0.07f, quality));
+            }
+
+            if (enableMobileHaptics && quality >= 0.78f && (Application.isMobilePlatform || Application.platform == RuntimePlatform.IPhonePlayer))
+            {
+                Handheld.Vibrate();
+            }
+        }
+
         private bool IsRunningState()
         {
             return currentState == GameState.Playing || currentState == GameState.RapidPhase;
@@ -192,6 +287,8 @@ namespace VikingRiverRowers
 
         private void Shake(float duration, float strength)
         {
+            if (reducedMotion) return;
+
             if (targetCamera == null)
             {
                 CacheCamera();
@@ -200,6 +297,37 @@ namespace VikingRiverRowers
             shakeDuration = Mathf.Max(duration, 0.01f);
             shakeTimer = Mathf.Max(shakeTimer, duration);
             shakeStrength = Mathf.Max(shakeStrength, strength);
+        }
+
+        public void SetHapticsEnabled(bool enabled)
+        {
+            enableMobileHaptics = enabled;
+            PlayerPrefs.SetInt(HapticsPreference, enabled ? 1 : 0);
+            PlayerPrefs.Save();
+        }
+
+        public void SetReducedMotion(bool enabled)
+        {
+            reducedMotion = enabled;
+            PlayerPrefs.SetInt(ReducedMotionPreference, enabled ? 1 : 0);
+            PlayerPrefs.Save();
+
+            if (enabled)
+            {
+                shakeTimer = 0f;
+                shakeStrength = 0f;
+                if (targetCamera != null)
+                {
+                    targetCamera.transform.localPosition = GetCameraBaseLocalPosition();
+                    targetCamera.transform.localRotation = cameraStartLocalRotation;
+                    if (!targetCamera.orthographic)
+                    {
+                        targetCamera.fieldOfView = cameraStartFieldOfView;
+                        fieldOfViewVelocity = 0f;
+                    }
+                }
+                SetRapidStreaksActive(false);
+            }
         }
 
         private void PlayParticleBurst(ParticleSystem effect, Vector3 position, int count)
@@ -245,8 +373,11 @@ namespace VikingRiverRowers
             var velocity = particles.velocityOverLifetime;
             velocity.enabled = true;
             velocity.space = ParticleSystemSimulationSpace.Local;
-            velocity.y = new ParticleSystem.MinMaxCurve(0.6f, 1.8f);
-            velocity.z = new ParticleSystem.MinMaxCurve(-1.4f, -0.4f);
+            // Unity requires every axis to use the same curve mode. Keep all three
+            // axes in Constant mode so assigning them never creates a mixed state.
+            velocity.x = new ParticleSystem.MinMaxCurve(0f);
+            velocity.y = new ParticleSystem.MinMaxCurve(1.2f);
+            velocity.z = new ParticleSystem.MinMaxCurve(-0.9f);
 
             var colorOverLifetime = particles.colorOverLifetime;
             colorOverLifetime.enabled = true;

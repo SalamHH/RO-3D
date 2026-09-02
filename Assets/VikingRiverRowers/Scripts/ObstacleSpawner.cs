@@ -5,7 +5,6 @@ namespace VikingRiverRowers
     public class ObstacleSpawner : MonoBehaviour
     {
         public static ObstacleSpawner Instance { get; private set; }
-
         [Header("Spawn Positions")]
         [SerializeField] private float spawnZPos = 45f;
         [SerializeField] private float[] laneXPositions = { -3f, 0f, 3f };
@@ -68,7 +67,7 @@ namespace VikingRiverRowers
             if (GameManager.Instance == null) return;
 
             GameState state = GameManager.Instance.CurrentState;
-            if (state == GameState.Playing || state == GameState.RapidPhase)
+            if (state == GameState.Playing || state == GameState.RapidPhase || state == GameState.RhythmLab)
             {
                 spawnTimer -= Time.deltaTime;
                 if (spawnTimer <= 0f)
@@ -109,6 +108,10 @@ namespace VikingRiverRowers
             if (GameManager.Instance.CurrentState == GameState.RapidPhase)
             {
                 currentInterval *= 0.65f;
+            }
+            else if (GameManager.Instance.CurrentState == GameState.RhythmLab)
+            {
+                currentInterval *= 1.35f;
             }
 
             spawnTimer = Mathf.Max(currentInterval, minimumSpawnInterval);

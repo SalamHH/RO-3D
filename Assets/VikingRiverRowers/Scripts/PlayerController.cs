@@ -28,6 +28,10 @@ namespace VikingRiverRowers
         [SerializeField] private float laneKickAngle = 12f;
         [SerializeField] private float boostPitchKickAngle = 8f;
         [SerializeField] private float feedbackReturnSpeed = 12f;
+        [SerializeField] private float rhythmImbalanceRollAngle = 8f;
+        [SerializeField] private float rhythmStrokePitchAngle = 4f;
+        [SerializeField] private float rhythmPairPitchKickAngle = 5f;
+        [SerializeField] private float rhythmCameraFov = 78f;
 
         [Header("Rapid Phase Pushback")]
         [SerializeField] private float pushbackSpeed = 1.6f; // Speed of drift backward
@@ -47,6 +51,13 @@ namespace VikingRiverRowers
         private float currentTilt = 0f;   // Smoothly lerped roll tilt
         private float laneKick;
         private float boostPitchKick;
+        private float rhythmLeftProgress;
+        private float rhythmRightProgress;
+        private float rhythmPairPitchKick;
+        private float rhythmHitRollKick;
+        private Camera cachedCamera;
+        private float defaultCameraFov;
+        private bool hasDefaultCameraFov;
 
         // Swipe processing variables
         private Vector2 touchStartPos;
@@ -54,6 +65,7 @@ namespace VikingRiverRowers
 
         // Boost events for animator syncing
         public bool IsBoosting { get; private set; }
+        public int CurrentLaneIndex => currentLane;
         public float RapidDanger01 => Mathf.Clamp01(Mathf.Abs(currentZ) / Mathf.Abs(minZLimit));
         private float boostVisualTimer;
 
@@ -73,21 +85,54 @@ namespace VikingRiverRowers
             ResetToMiddleLane();
         }
 
+        private void OnEnable()
+        {
+            RhythmRowingLabController.OnStrokeProgressChanged += HandleRhythmStrokeProgress;
+            RhythmRowingLabController.OnPairedStrokeEvaluated += HandleRhythmPairedStroke;
+        }
+
+        private void OnDisable()
+        {
+            RhythmRowingLabController.OnStrokeProgressChanged -= HandleRhythmStrokeProgress;
+            RhythmRowingLabController.OnPairedStrokeEvaluated -= HandleRhythmPairedStroke;
+        }
+
         private void Update()
         {
             if (GameManager.Instance == null) return;
 
             GameState state = GameManager.Instance.CurrentState;
-            if (state == GameState.GameOver || state == GameState.Menu)
+            if (state == GameState.Paused) return;
+
+            if (state == GameState.GameOver || state == GameState.Menu || state == GameState.RhythmLab)
             {
                 // Reset positions in Menu/GameOver
                 ApplyBobbing(0.5f); // Gentle bobbing in menu
                 currentZ = Mathf.MoveTowards(currentZ, 0f, zRecoverySpeed * Time.deltaTime);
+                rhythmPairPitchKick = Mathf.MoveTowards(rhythmPairPitchKick, 0f, feedbackReturnSpeed * Time.deltaTime);
+                rhythmHitRollKick = Mathf.MoveTowards(rhythmHitRollKick, 0f, feedbackReturnSpeed * Time.deltaTime);
                 Vector3 menuPos = transform.position;
                 menuPos.y = visualYOffset;
                 menuPos.z = currentZ;
-                menuPos.x = Mathf.SmoothDamp(menuPos.x, lanePositions[1], ref laneSwitchVelocity, laneSwitchSmoothTime);
+                UpdateRhythmCameraFraming(state == GameState.RhythmLab);
+                float rhythmTargetX = state == GameState.RhythmLab ? lanePositions[currentLane] : lanePositions[1];
+                menuPos.x = Mathf.SmoothDamp(menuPos.x, rhythmTargetX, ref laneSwitchVelocity, laneSwitchSmoothTime);
                 transform.position = menuPos;
+
+                if (state == GameState.RhythmLab)
+                {
+                    float imbalance = rhythmRightProgress - rhythmLeftProgress;
+                    float strokeLoad = Mathf.Max(rhythmLeftProgress, rhythmRightProgress);
+                    float targetRoll = imbalance * rhythmImbalanceRollAngle;
+                    float rhythmFinalRoll = targetRoll + rhythmHitRollKick + Mathf.Sin(Time.time * rollFrequency) * (rollAmplitude * 0.45f);
+                    float rhythmFinalPitch = rhythmPairPitchKick - (strokeLoad * rhythmStrokePitchAngle) + Mathf.Cos(Time.time * bobFrequency) * (rollAmplitude * 0.25f);
+                    transform.rotation = Quaternion.Euler(rhythmFinalPitch, 0f, rhythmFinalRoll);
+                }
+                else
+                {
+                    transform.rotation = Quaternion.identity;
+                }
+
                 return;
             }
 
@@ -280,9 +325,53 @@ namespace VikingRiverRowers
             boostPitchKick = 0f;
             IsBoosting = false;
             boostVisualTimer = 0f;
+            rhythmLeftProgress = 0f;
+            rhythmRightProgress = 0f;
+            rhythmPairPitchKick = 0f;
+            rhythmHitRollKick = 0f;
 
             transform.position = new Vector3(targetX, floatHeight, 0f);
             transform.rotation = Quaternion.identity;
+        }
+
+        public void ApplyRhythmSteering(RowingLane lane)
+        {
+            if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.RhythmLab) return;
+
+            int direction = lane == RowingLane.Left ? -1 : 1;
+            currentLane = Mathf.Clamp(currentLane + direction, 0, lanePositions.Length - 1);
+            rhythmHitRollKick = -direction * (laneKickAngle * 0.45f);
+        }
+
+        private void UpdateRhythmCameraFraming(bool rhythmActive)
+        {
+            if (cachedCamera == null)
+            {
+                cachedCamera = Camera.main;
+                if (cachedCamera == null) return;
+            }
+
+            if (!hasDefaultCameraFov)
+            {
+                defaultCameraFov = cachedCamera.fieldOfView;
+                hasDefaultCameraFov = true;
+            }
+
+            float targetFov = rhythmActive ? rhythmCameraFov : defaultCameraFov;
+            cachedCamera.fieldOfView = Mathf.Lerp(cachedCamera.fieldOfView, targetFov, 6f * Time.deltaTime);
+        }
+
+        private void HandleRhythmStrokeProgress(float leftProgress, float rightProgress, bool leftActive, bool rightActive)
+        {
+            rhythmLeftProgress = leftActive ? leftProgress : 0f;
+            rhythmRightProgress = rightActive ? rightProgress : 0f;
+        }
+
+        private void HandleRhythmPairedStroke(float rowQuality01, string label)
+        {
+            if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.RhythmLab) return;
+
+            rhythmPairPitchKick = -rhythmPairPitchKickAngle * Mathf.Clamp01(rowQuality01);
         }
 
         private void ApplyBobbing(float speedMultiplier)
@@ -305,6 +394,23 @@ namespace VikingRiverRowers
             // Colliding with obstacles triggers Game Over
             if (other.CompareTag("Obstacle"))
             {
+                if (GameManager.Instance != null && GameManager.Instance.CurrentState == GameState.RhythmLab)
+                {
+                    bool runContinues = GameManager.Instance.HandleSwipeObstacleHit();
+                    rhythmHitRollKick = transform.position.x >= 0f ? -laneKickAngle : laneKickAngle;
+
+                    if (runContinues)
+                    {
+                        Obstacle obstacle = other.GetComponentInParent<Obstacle>();
+                        if (obstacle != null)
+                        {
+                            Destroy(obstacle.gameObject);
+                        }
+                    }
+
+                    return;
+                }
+
                 GameManager.Instance.TriggerGameOver();
             }
         }

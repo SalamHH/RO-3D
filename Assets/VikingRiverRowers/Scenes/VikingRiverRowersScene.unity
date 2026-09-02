@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
+  m_SkyboxMaterial: {fileID: 2100000, guid: 9ca22510633fbfd4399f1704cd9d5c72, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -195,6 +195,18 @@ PrefabInstance:
       value: 0.0027946234
       objectReference: {fileID: 0}
     - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2482564336250899614, guid: 74eb2d1ec64714a8f94204fd9d623efd, type: 3}
       propertyPath: m_LocalRotation.w
       value: 0.70581305
       objectReference: {fileID: 0}
@@ -267,7 +279,7 @@ Camera:
   m_GameObject: {fileID: 892932166}
   m_Enabled: 1
   serializedVersion: 2
-  m_ClearFlags: 2
+  m_ClearFlags: 1
   m_BackGroundColor: {r: 0.18, g: 0.28, b: 0.35, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
@@ -593,6 +605,10 @@ MonoBehaviour:
   trunkMaterial: {fileID: 0}
   foliageMaterial: {fileID: 0}
   foamMaterial: {fileID: 0}
+  natureTreePrefab: {fileID: 4936530724998089411, guid: 13b7e8cd7a91041429d22d89f4bc4c4c, type: 3}
+  natureRockPrefabs:
+  - {fileID: 2961240618111753742, guid: 132cf5cdcb13eb749859db022c5d31bf, type: 3}
+  - {fileID: 75903924722977951, guid: 5116c59172cfeca41b485df692d44961, type: 3}
   natureTreeSourceMaterial: {fileID: 2100000, guid: cd07d8a28e2acb9468ecb30a6f45820b, type: 2}
   natureRockSourceMaterial: {fileID: 2100000, guid: c6010fd8a9033e94399bc3b59a4be473, type: 2}
   natureBankSourceMaterial: {fileID: 2100000, guid: ea94bc05f4e812349a43dff1264c21ec, type: 2}

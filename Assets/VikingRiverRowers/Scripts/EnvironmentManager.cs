@@ -1,8 +1,5 @@
 using UnityEngine;
 using Bitgem.VFX.StylisedWater;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 namespace VikingRiverRowers
 {
@@ -14,6 +11,11 @@ namespace VikingRiverRowers
         [SerializeField] private int segmentCount = 10;
         [SerializeField] private float segmentLength = 20f;
         [SerializeField] private float startZOffset = -60f; // Starts well behind the camera so no trailing edge is visible.
+        [SerializeField] private float waterTextureFlowMultiplier = 0.035f;
+
+        [Header("Surge Scenery Response")]
+        [SerializeField] private float surgeScenerySpeedMultiplier = 1.45f;
+        [SerializeField] private float surgeResponseSpeed = 3f;
 
         [Header("Materials")]
         [SerializeField] private Material waterMaterial;
@@ -23,17 +25,19 @@ namespace VikingRiverRowers
         [SerializeField] private Material foamMaterial;
 
         [Header("A Piece Of Nature Assets")]
+        [SerializeField] private GameObject natureTreePrefab;
+        [SerializeField] private GameObject[] natureRockPrefabs;
         [SerializeField] private Material natureTreeSourceMaterial;
         [SerializeField] private Material natureRockSourceMaterial;
         [SerializeField] private Material natureBankSourceMaterial;
 
-        private GameObject natureTreePrefab;
-        private GameObject[] natureRockPrefabs;
         private Material natureTreeMaterial;
         private Material natureRockMaterial;
         private Material natureBankMaterial;
         private GameObject[] segments;
         private float totalLength;
+        private Vector2 waterTextureOffset;
+        private float scenerySpeedMultiplier = 1f;
 
         private void Awake()
         {
@@ -48,7 +52,6 @@ namespace VikingRiverRowers
         private void Start()
         {
             totalLength = segmentCount * segmentLength;
-            LoadNaturePrefabs();
             CreateMaterials();
             ConfigureSceneEnvironment();
             SpawnSegments();
@@ -384,27 +387,23 @@ namespace VikingRiverRowers
             }
         }
 
-        private void LoadNaturePrefabs()
-        {
-#if UNITY_EDITOR
-            natureTreePrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/A_piece_of_nature/Prefabs/Pine_tree.prefab");
-            natureRockPrefabs = new[]
-            {
-                AssetDatabase.LoadAssetAtPath<GameObject>("Assets/A_piece_of_nature/Prefabs/Rock_3.prefab"),
-                AssetDatabase.LoadAssetAtPath<GameObject>("Assets/A_piece_of_nature/Prefabs/Rock_4.prefab")
-            };
-#else
-            natureTreePrefab = null;
-            natureRockPrefabs = null;
-#endif
-        }
-
         private void Update()
         {
             if (GameManager.Instance == null) return;
             if (segments == null) return;
 
-            float scrollSpeed = GameManager.Instance.CurrentSpeed;
+            bool surgeActive = GameManager.Instance.CurrentState == GameState.RapidPhase || GameManager.Instance.IsSwipeSurging;
+            float targetMultiplier = surgeActive ? Mathf.Max(1f, surgeScenerySpeedMultiplier) : 1f;
+            scenerySpeedMultiplier = Mathf.MoveTowards(
+                scenerySpeedMultiplier,
+                targetMultiplier,
+                Mathf.Max(0.01f, surgeResponseSpeed) * Time.deltaTime
+            );
+
+            // Scenery gets extra surge-only parallax. Obstacles continue to use CurrentSpeed,
+            // preserving collision timing while trees and riverbanks sell the acceleration.
+            float scrollSpeed = GameManager.Instance.CurrentSpeed * scenerySpeedMultiplier;
+            AnimateWaterSurface(scrollSpeed);
             if (scrollSpeed <= 0f) return;
 
             // Scroll all segments in -Z
@@ -424,6 +423,24 @@ namespace VikingRiverRowers
                 }
 
                 segments[i].transform.position = pos;
+            }
+        }
+
+        private void AnimateWaterSurface(float scrollSpeed)
+        {
+            if (waterMaterial == null || scrollSpeed <= 0f) return;
+
+            waterTextureOffset.y -= scrollSpeed * waterTextureFlowMultiplier * Time.deltaTime;
+            waterMaterial.mainTextureOffset = waterTextureOffset;
+
+            if (waterMaterial.HasProperty("_BaseMap"))
+            {
+                waterMaterial.SetTextureOffset("_BaseMap", waterTextureOffset);
+            }
+
+            if (waterMaterial.HasProperty("_MainTex"))
+            {
+                waterMaterial.SetTextureOffset("_MainTex", waterTextureOffset);
             }
         }
 
